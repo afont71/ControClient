@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
 using ControClient.Web.Security;
@@ -68,10 +68,13 @@ public sealed class InfoPageService(IServiceScopeFactory scopes, AuthenticationS
     {
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        return await db.FormTemplates.AsNoTracking().Where(t => t.IsActive)
+        var list = await db.FormTemplates.AsNoTracking().Where(t => t.IsActive).ToListAsync();
+        return list
+            .GroupBy(t => t.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(t => t.Version).First())
             .OrderBy(t => t.Name)
             .Select(t => new TemplateOption(t.Id, t.Name))
-            .ToListAsync();
+            .ToList();
     }
 
     public async Task<IReadOnlyList<ClientOption>> ClientsAsync()

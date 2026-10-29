@@ -103,9 +103,17 @@ else
         _templates = await Fichas.TemplatesAsync();
         _records = await Fichas.RecordsAsync(ClientId);
 
-        _withRecords = _templates
-            .Select(t => (t, _records.Where(r => r.TemplateId == t.Id).ToList()))
-            .Where(x => x.Item2.Count > 0)
+        // Agrupa por nombre: una ficha creada con una versión anterior del tipo
+        // debe seguir viéndose aunque ya exista una versión nueva.
+        _withRecords = _records
+            .GroupBy(r => r.TemplateName, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                var template = _templates.FirstOrDefault(t => string.Equals(t.Name, g.Key, StringComparison.OrdinalIgnoreCase))
+                               ?? new FormPageService.TemplateRow(g.First().TemplateId, g.Key, g.Key, null, 0);
+                return (template, g.ToList());
+            })
+            .OrderBy(x => x.template.Name)
             .ToList();
     }
 

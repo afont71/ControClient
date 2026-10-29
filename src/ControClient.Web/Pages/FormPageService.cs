@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
@@ -25,7 +25,14 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
         using var scope = scopes.CreateScope();
         var forms = scope.ServiceProvider.GetRequiredService<FormService>();
         var list = await forms.ListTemplatesAsync(includeInactive: false);
-        return list.Select(t => new TemplateRow(t.Id, t.Key, t.Name, t.Description, t.Version)).ToList();
+
+        // Solo la última versión de cada clave: las anteriores son histórico.
+        return list
+            .GroupBy(t => t.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(t => t.Version).First())
+            .OrderBy(t => t.Name)
+            .Select(t => new TemplateRow(t.Id, t.Key, t.Name, t.Description, t.Version))
+            .ToList();
     }
 
     public async Task<IReadOnlyList<RecordRow>> RecordsAsync(Guid clientId)    {
