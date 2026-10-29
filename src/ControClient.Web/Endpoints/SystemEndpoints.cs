@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Security.Claims;
+using ControClient.Domain.Abstractions;
+using ControClient.Domain.Auditing;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
 using ControClient.Web.Security;
@@ -74,8 +76,79 @@ public static class SystemEndpoints
             return Results.Ok(events);
         }).RequireAuthorization();
 
+        // Usuarios: solo administración, para poder conceder permisos por cliente.
+        app.MapGet("/api/v1/users", async (
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var user = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (user is null)
+                return Results.Unauthorized();
+
+            if (!user.IsIn(AppRole.Administrator))
+                return Results.Forbid();
+
+            var users = await db.Users.AsNoTracking()
+                .OrderBy(u => u.DisplayName)
+                .Select(u => new { u.Id, u.EntraObjectId, u.DisplayName, Role = u.Role.ToString(), u.IsActive })
+                .ToListAsync(ct);
+
+            return Results.Ok(users);
+        }).RequireAuthorization();
+
+        // Cambio de rol: solo administración y queda auditado (PRM-13, PRM-15: no autoaprobación).
+        app.MapPatch("/api/v1/users/{id:guid}/role", async (
+            Guid id,
+            ChangeRoleRequest request,
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            AppDbContext db,
+            IAuditWriter audit,
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
+        {
+            var actor = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (actor is null)
+                return Results.Unauthorized();
+
+            if (!actor.IsIn(AppRole.Administrator))
+                return Results.Forbid();
+
+            if (!Enum.TryParse<AppRole>(request.Role, ignoreCase: true, out var role))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["role"] = ["Rol inválido."]
+                });
+
+            var target = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+            if (target is null)
+                return Results.NotFound();
+
+            // No autoaprobación: nadie cambia su propio rol (PRM-15).
+            if (target.Id == actor.Id)
+                return Results.Forbid();
+
+            target.ChangeRole(role);
+            await db.SaveChangesAsync(ct);
+
+            await audit.WriteAsync(new AuditEvent(
+                entity: "users",
+                action: "users.change_role",
+                actorName: actor.DisplayName,
+                actorObjectId: actor.EntraObjectId,
+                correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
+                reason: $"usuario={target.EntraObjectId} rol={role}",
+                ipAddress: http.HttpContext?.Connection.RemoteIpAddress?.ToString()), ct);
+
+            return Results.Ok(new { target.Id, Role = target.Role.ToString() });
+        }).RequireAuthorization();
+
         return app;
     }
+
+    public sealed record ChangeRoleRequest(string Role);
 
     private static string AppVersion() =>
         Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";

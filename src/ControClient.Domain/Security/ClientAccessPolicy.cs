@@ -1,4 +1,4 @@
-﻿using ControClient.Domain.Users;
+using ControClient.Domain.Users;
 
 namespace ControClient.Domain.Security;
 
@@ -8,6 +8,15 @@ namespace ControClient.Domain.Security;
 /// </summary>
 public interface IClientAccessPolicy
 {
+    /// <summary>El rol ve todos los clientes sin necesidad de concesión (administrador, auditor).</summary>
+    bool CanViewAnyClient(AppUser user);
+
+    /// <summary>El rol puede editar cualquier cliente sin concesión (solo administrador).</summary>
+    bool CanEditAnyClient(AppUser user);
+
+    /// <summary>El rol puede revelar secretos si además tiene concesión sobre el cliente.</summary>
+    bool CanRevealSecretsByRole(AppUser user);
+
     bool CanViewClient(AppUser user, Guid clientId, IReadOnlyCollection<Guid> grantedClientIds);
 
     bool CanEditClient(AppUser user, Guid clientId, IReadOnlyCollection<Guid> grantedClientIds);
@@ -26,12 +35,21 @@ public sealed class ClientAccessPolicy : IClientAccessPolicy
     private static readonly HashSet<AppRole> CanEdit = [AppRole.Administrator, AppRole.ClientManager, AppRole.Technician];
     private static readonly HashSet<AppRole> CanReveal = [AppRole.Technician, AppRole.VaultCustodian];
 
+    public bool CanViewAnyClient(AppUser user) =>
+        user is not null && user.IsActive && GlobalView.Contains(user.Role);
+
+    public bool CanEditAnyClient(AppUser user) =>
+        user is not null && user.IsActive && user.Role == AppRole.Administrator;
+
+    public bool CanRevealSecretsByRole(AppUser user) =>
+        user is not null && user.IsActive && CanReveal.Contains(user.Role);
+
     public bool CanViewClient(AppUser user, Guid clientId, IReadOnlyCollection<Guid> grantedClientIds)
     {
         if (user is null || !user.IsActive)
             return false;
 
-        if (GlobalView.Contains(user.Role))
+        if (CanViewAnyClient(user))
             return true;
 
         return ScopedView.Contains(user.Role) && grantedClientIds.Contains(clientId);
@@ -42,7 +60,7 @@ public sealed class ClientAccessPolicy : IClientAccessPolicy
         if (user is null || !user.IsActive || !CanEdit.Contains(user.Role))
             return false;
 
-        return user.Role == AppRole.Administrator || grantedClientIds.Contains(clientId);
+        return CanEditAnyClient(user) || grantedClientIds.Contains(clientId);
     }
 
     /// <summary>
@@ -51,10 +69,9 @@ public sealed class ClientAccessPolicy : IClientAccessPolicy
     /// </summary>
     public bool CanRevealSecret(AppUser user, Guid clientId, IReadOnlyCollection<Guid> grantedClientIds)
     {
-        if (user is null || !user.IsActive || !CanReveal.Contains(user.Role))
+        if (!CanRevealSecretsByRole(user))
             return false;
 
         return grantedClientIds.Contains(clientId);
     }
 }
-

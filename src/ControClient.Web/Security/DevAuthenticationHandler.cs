@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -21,9 +21,18 @@ public sealed class DevAuthenticationHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var objectId = configuration["Authentication:Dev:ObjectId"] ?? "dev-admin-0001";
-        var name = configuration["Authentication:Dev:Name"] ?? "Administrador de desarrollo";
-        var role = configuration["Authentication:Dev:Role"] ?? "Administrator";
+        // Solo en desarrollo: permite simular otro usuario con cabeceras para
+        // probar permisos sin un segundo tenant. Este handler no se registra fuera
+        // de Development (ver Program.cs).
+        var objectId = Header("X-Dev-ObjectId")
+                       ?? configuration["Authentication:Dev:ObjectId"]
+                       ?? "dev-admin-0001";
+        var name = Header("X-Dev-Name")
+                   ?? configuration["Authentication:Dev:Name"]
+                   ?? "Administrador de desarrollo";
+        var role = Header("X-Dev-Role")
+                   ?? configuration["Authentication:Dev:Role"]
+                   ?? "Administrator";
 
         var claims = new List<Claim>
         {
@@ -39,6 +48,12 @@ public sealed class DevAuthenticationHandler(
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, SchemeName);
         return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+
+    private string? Header(string name)
+    {
+        var values = Context.Request.Headers[name];
+        return values.Count > 0 && !string.IsNullOrWhiteSpace(values[0]) ? values[0] : null;
     }
 }
 

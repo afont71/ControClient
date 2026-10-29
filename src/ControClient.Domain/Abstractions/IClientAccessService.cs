@@ -1,0 +1,20 @@
+﻿using ControClient.Domain.Clients;
+using ControClient.Domain.Users;
+
+namespace ControClient.Domain.Abstractions;
+
+/// <summary>
+/// Resuelve qué clientes ve y puede tocar un usuario, combinando su rol y sus
+/// concesiones vigentes. Se evalúa en servidor antes de responder (AC-05).
+/// </summary>
+public interface IClientAccessService
+{
+    /// <summary>Devuelve todos los identificadores visibles; <c>null</c> significa "todos" (rol global).</summary>
+    Task<IReadOnlyCollection<Guid>?> GetVisibleClientIdsAsync(AppUser user, CancellationToken ct = default);
+
+    Task<bool> CanViewAsync(AppUser user, Guid clientId, CancellationToken ct = default);
+
+    Task<bool> CanEditAsync(AppUser user, Guid clientId, CancellationToken ct = default);
+
+    Task<bool> CanRevealAsync(AppUser user, Guid clientId, CancellationToken ct = default);
+}

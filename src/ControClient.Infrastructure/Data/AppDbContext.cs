@@ -1,4 +1,4 @@
-﻿using ControClient.Domain.Auditing;
+using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<ClientGrant> Grants => Set<ClientGrant>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -43,6 +44,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
             e.HasIndex(x => x.EntraObjectId).IsUnique().HasDatabaseName("ux_users_entra_object_id");
+        });
+
+        modelBuilder.Entity<ClientGrant>(e =>
+        {
+            e.ToTable("client_grants");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.ClientId).HasColumnName("client_id");
+            e.Property(x => x.Actions).HasColumnName("actions").HasConversion<int>();
+            e.Property(x => x.GrantedAt).HasColumnName("granted_at");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.Property(x => x.GrantedBy).HasColumnName("granted_by").HasMaxLength(200);
+            e.HasIndex(x => new { x.UserId, x.ClientId }).IsUnique().HasDatabaseName("ux_client_grants_user_client");
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_client_grants_user");
+            e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_client_grants_client");
         });
 
         modelBuilder.Entity<AuditEvent>(e =>

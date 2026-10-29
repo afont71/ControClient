@@ -9,15 +9,16 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Pieza | Estado |
 | --- | --- |
 | Solución .NET 9 (Domain / Infrastructure / Web / Tests) | ✅ |
-| PostgreSQL + EF Core con migración inicial | ✅ definida (requiere instancia) |
+| PostgreSQL + EF Core con migraciones aplicadas | ✅ |
 | Autenticación Microsoft Entra ID + MFA (web y API) | ✅ cableada; falta tenant real |
-| Autorización por rol y alcance por cliente | ✅ base (política + matriz) |
+| Concesiones por cliente (ver/editar/revelar) | ✅ |
+| Pantallas de clientes (lista, alta, ficha, permisos) | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
-| Endpoints de salud, sistema, clientes y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 18 |
+| Endpoints de salud, sistema, clientes, usuarios y auditoría | ✅ |
+| Pruebas automatizadas | ✅ 24 |
 | CI (build + test) | ✅ |
 
-Pendiente de las siguientes etapas: concesiones por cliente y fichas dinámicas (1–2), documentación (3), bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
+Pendiente: fichas dinámicas (2), documentación (3), bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
 
 ## Estructura
 
@@ -50,9 +51,30 @@ Endpoints útiles:
 | --- | --- | --- |
 | `GET /health` | nada | estado del servicio y de la base |
 | `GET /api/v1/system/info` | sesión con MFA | versión, entorno, estado de bóveda |
-| `GET /api/v1/clients` | sesión; alcance por rol | clientes visibles |
-| `POST /api/v1/clients` | administrador o responsable | alta de cliente + auditoría |
+| `GET /api/v1/clients?query=&page=` | sesión; alcance por rol | clientes visibles, paginados |
+| `GET /api/v1/clients/{id}` | ver el cliente | detalle; **404** si está fuera de alcance |
+| `POST /api/v1/clients` | administrador o responsable | alta + auditoría |
+| `PATCH /api/v1/clients/{id}` | editar el cliente | nombre y estado comercial |
+| `GET /api/v1/clients/{id}/grants` | editar el cliente | concesiones vigentes |
+| `POST /api/v1/clients/{id}/grants` | administrador | crea o actualiza concesión |
+| `DELETE /api/v1/clients/{id}/grants/{grantId}` | administrador | revoca concesión |
+| `GET /api/v1/users` | administrador | usuarios para conceder permisos |
+| `PATCH /api/v1/users/{id}/role` | administrador | cambia rol (no el propio) |
 | `GET /api/v1/audit/events` | administrador, auditor o custodio | últimos 50 eventos |
+
+Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar secretos. Se combinan sumando: `3` = ver y editar.
+
+### Simular usuarios en desarrollo
+
+Con `Authentication:Mode = Development`, cualquier petición puede cambiar de usuario con cabeceras:
+
+```powershell
+# Técnico simulado
+$h = @{ 'X-Dev-ObjectId' = 'tech-0001'; 'X-Dev-Role' = 'Technician'; 'X-Dev-Name' = 'Técnico de prueba' }
+Invoke-WebRequest http://127.0.0.1:5080/api/v1/clients -Headers $h
+```
+
+El primer acceso crea el usuario como **ReadOnly**; el rol se cambia con `PATCH /api/v1/users/{id}/role`. Fuera de Development este mecanismo no existe.
 
 ## Ejecutar con PostgreSQL y Entra ID
 

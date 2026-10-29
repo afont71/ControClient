@@ -1,0 +1,112 @@
+﻿@page "/clientes"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ClientPageService Servicio
+
+<PageTitle>Clientes</PageTitle>
+
+<h1>Clientes</h1>
+
+<div class="toolbar">
+    <input type="search" placeholder="Buscar por nombre o alias…" @bind="_query" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+    <a class="button" href="/clientes/nuevo">Nuevo cliente</a>
+</div>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+
+@if (_loading)
+{
+    <p>Cargando…</p>
+}
+else if (_items.Count == 0)
+{
+    <p class="muted">No hay clientes visibles para tu usuario.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr><th>Nombre</th><th>Alias</th><th>Estado</th><th>Creado</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var item in _items)
+            {
+                <tr>
+                    <td><a href="@($"/clientes/{item.Id}")">@item.Name</a></td>
+                    <td>@item.Alias</td>
+                    <td>@item.Status</td>
+                    <td>@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="pager">
+        <button disabled="@(_page <= 1)" @onclick="Previous">Anterior</button>
+        <span>Página @_page de @TotalPages (@_total clientes)</span>
+        <button disabled="@(_page >= TotalPages)" @onclick="Next">Siguiente</button>
+    </div>
+}
+
+@code {
+    private const int PageSize = 20;
+    private IReadOnlyList<ClientPageService.ClientRow> _items = [];
+    private string? _query;
+    private string? _error;
+    private bool _loading = true;
+    private int _page = 1;
+    private int _total;
+
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(_total / (double)PageSize));
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var result = await Servicio.ListAsync(_query, _page, PageSize);
+            _items = result.Items;
+            _total = result.Total;
+        }
+        catch (Exception ex)
+        {
+            _error = $"No se pudo cargar la lista: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs args)
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task Previous()
+    {
+        if (_page > 1) { _page--; await LoadAsync(); }
+    }
+
+    private async Task Next()
+    {
+        if (_page < TotalPages) { _page++; await LoadAsync(); }
+    }
+}
+
+<style>
+    .toolbar { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; }
+    .toolbar input { flex: 1; max-width: 26rem; padding: .5rem; }
+    .button { background: #006EB3; color: #fff; padding: .5rem .9rem; border-radius: 6px; text-decoration: none; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .5rem; text-align: left; }
+    .pager { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+</style>

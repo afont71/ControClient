@@ -1,0 +1,76 @@
+@page "/clientes/nuevo"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ClientPageService Clientes
+@inject NavigationManager Navigation
+
+<PageTitle>Nuevo cliente</PageTitle>
+
+<h1>Nuevo cliente</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+
+<EditForm Model="_model" OnValidSubmit="SaveAsync">
+    <DataAnnotationsValidator />
+    <p>
+        <label>Nombre *<br />
+            <InputText @bind-Value="_model.Name" />
+        </label>
+        <ValidationMessage For="() => _model.Name" />
+    </p>
+    <p>
+        <label>Alias<br />
+            <InputText @bind-Value="_model.Alias" />
+        </label>
+    </p>
+    <button type="submit" disabled="@_saving">@(_saving ? "Guardando…" : "Crear cliente")</button>
+    <a href="/clientes">Cancelar</a>
+</EditForm>
+
+<p class="muted">El estado comercial empieza como <strong>PendingValidation</strong>: no se deduce de la actividad documental.</p>
+
+@code {
+    private readonly Model _model = new();
+    private string? _error;
+    private bool _saving;
+
+    public sealed class Model
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El nombre es obligatorio.")]
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string? Alias { get; set; }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var (ok, error) = await Clientes.CreateAsync(_model.Name, _model.Alias);
+            if (!ok)
+            {
+                _error = error;
+                return;
+            }
+
+            Navigation.NavigateTo("/clientes");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
+
+<style>
+    .error { color: #B00020; }
+    .muted { color: #4B5563; }
+    input[type=text], input:not([type]) { padding: .5rem; min-width: 20rem; }
+</style>

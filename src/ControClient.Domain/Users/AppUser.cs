@@ -1,4 +1,4 @@
-﻿namespace ControClient.Domain.Users;
+namespace ControClient.Domain.Users;
 
 /// <summary>
 /// Usuario de la aplicación. La identidad real vive en Entra ID: aquí solo se
@@ -29,6 +29,16 @@ public sealed class AppUser
     public DateTimeOffset? LastLoginAt { get; private set; }
 
     public void RegisterLogin() => LastLoginAt = DateTimeOffset.UtcNow;
+
+    public bool IsIn(params AppRole[] roles) => IsActive && Array.IndexOf(roles, Role) >= 0;
+
+    public void UpdateProfile(string displayName, string? email)
+    {
+        if (!string.IsNullOrWhiteSpace(displayName))
+            DisplayName = displayName.Trim();
+
+        Email = string.IsNullOrWhiteSpace(email) ? Email : email.Trim();
+    }
 
     public void ChangeRole(AppRole role) => Role = role;
 

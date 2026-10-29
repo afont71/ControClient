@@ -1,7 +1,8 @@
-﻿using ControClient.Domain.Abstractions;
+using ControClient.Domain.Abstractions;
 using ControClient.Domain.Security;
 using ControClient.Infrastructure.Auditing;
 using ControClient.Infrastructure.Data;
+using ControClient.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +21,7 @@ public static class DependencyInjection
 
         if (provider.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("clientesit-dev"));
+            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase("ControClient-dev"));
         }
         else
         {
@@ -32,6 +33,8 @@ public static class DependencyInjection
 
         services.AddScoped<IAuditWriter, AuditWriter>();
         services.AddSingleton<IClientAccessPolicy, ClientAccessPolicy>();
+        services.AddScoped<IClientAccessService, ClientAccessService>();
+        services.AddScoped<IUserProvisioner, UserProvisioner>();
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
         return services;

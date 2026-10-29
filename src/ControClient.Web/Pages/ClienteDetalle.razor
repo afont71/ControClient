@@ -1,0 +1,214 @@
+﻿@page "/clientes/{Id:guid}"
+@using Microsoft.AspNetCore.Authorization
+@using ControClient.Domain.Clients
+@attribute [Authorize]
+@inject ClientPageService Clientes
+
+<PageTitle>Ficha de cliente</PageTitle>
+
+@if (_loading)
+{
+    <p>Cargando…</p>
+}
+else if (_client is null)
+{
+    <h1>Cliente no disponible</h1>
+    <p class="muted">No existe o no tienes acceso a él.</p>
+    <a href="/clientes">Volver</a>
+}
+else
+{
+    <h1>@_client.Name</h1>
+    <p class="muted">
+        Alias: @(_client.Alias ?? "—") · Estado: <strong>@_client.Status</strong> ·
+        Creado: @_client.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")
+    </p>
+
+    @if (_message is not null)
+    {
+        <p class="@(_isError ? "error" : "ok")">@_message</p>
+    }
+
+    @if (_client.CanEdit)
+    {
+        <section>
+            <h2>Datos</h2>
+            <EditForm Model="_form" OnValidSubmit="SaveAsync">
+                <DataAnnotationsValidator />
+                <p>
+                    <label>Nombre<br /><InputText @bind-Value="_form.Name" /></label>
+                    <ValidationMessage For="() => _form.Name" />
+                </p>
+                <p>
+                    <label>Estado comercial<br />
+                        <InputSelect @bind-Value="_form.Status">
+                            @foreach (var status in Enum.GetNames<ClientStatus>())
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </InputSelect>
+                    </label>
+                </p>
+                <button type="submit" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar")</button>
+            </EditForm>
+        </section>
+
+        <section>
+            <h2> Permisos de acceso</h2>
+            <p class="muted">Sin concesión vigente, el usuario no ve este cliente. Un administrador no puede revelar secretos por su rol.</p>
+
+            @if (_grants.Count == 0)
+            {
+                <p>Sin concesiones.</p>
+            }
+            else
+            {
+                <table>
+                    <thead><tr><th>Usuario</th><th>Acciones</th><th>Concedida</th><th>Caduca</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var g in _grants)
+                        {
+                            <tr>
+                                <td>@g.UserName</td>
+                                <td>@g.Actions</td>
+                                <td>@g.GrantedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                                <td>@(g.ExpiresAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—")</td>
+                                <td><button @onclick="() => RevokeAsync(g.Id)">Revocar</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (_users.Count > 0)
+            {
+                <h3>Añadir o actualizar concesión</h3>
+                <p>
+                    <label>Usuario<br />
+                        <InputSelect @bind-Value="_grantForm.UserId">
+                            <option value="">Selecciona…</option>
+                            @foreach (var u in _users)
+                            {
+                                <option value="@u.Id">@u.Name (@u.Role)</option>
+                            }
+                        </InputSelect>
+                    </label>
+                </p>
+                <p>
+                    <label><input type="checkbox" @bind="_grantForm.View" /> Ver</label>
+                    <label><input type="checkbox" @bind="_grantForm.Edit" /> Editar</label>
+                    <label><input type="checkbox" @bind="_grantForm.Reveal" /> Revelar secretos</label>
+                </p>
+                <button @onclick="GrantAsync" disabled="@_saving">Conceder</button>
+            }
+        </section>
+    }
+    else
+    {
+        <p class="muted">Tienes acceso de consulta: no puedes modificar este cliente.</p>
+    }
+
+    <p><a href="/clientes">Volver a clientes</a></p>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ClientPageService.ClientDetail? _client;
+    private IReadOnlyList<ClientPageService.GrantRow> _grants = [];
+    private IReadOnlyList<ClientPageService.UserRow> _users = [];
+    private readonly Form _form = new();
+    private readonly GrantForm _grantForm = new();
+    private bool _loading = true;
+    private bool _saving;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _client = await Clientes.GetAsync(Id);
+        if (_client is not null)
+        {
+            _form.Name = _client.Name;
+            _form.Status = _client.Status;
+            _grants = await Clientes.GrantsAsync(Id);
+            _users = await Clientes.UsersAsync();
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _message = null;
+        try
+        {
+            var (ok, error) = await Clientes.UpdateAsync(Id, _form.Name, _form.Status);
+            SetMessage(ok ? "Cliente actualizado." : error ?? "No se pudo guardar.", !ok);
+            if (ok) await OnParametersSetAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task GrantAsync()
+    {
+        if (!Guid.TryParse(_grantForm.UserId, out var userId))
+        {
+            SetMessage("Selecciona un usuario.", true);
+            return;
+        }
+
+        var actions = GrantActions.None;
+        if (_grantForm.View) actions |= GrantActions.View;
+        if (_grantForm.Edit) actions |= GrantActions.Edit;
+        if (_grantForm.Reveal) actions |= GrantActions.RevealSecret;
+
+        _saving = true;
+        try
+        {
+            var (ok, error) = await Clientes.UpsertGrantAsync(Id, userId, actions, null);
+            SetMessage(ok ? "Concesión guardada." : error ?? "No se pudo guardar.", !ok);
+            if (ok) await OnParametersSetAsync();
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task RevokeAsync(Guid grantId)
+    {
+        var (ok, error) = await Clientes.RevokeAsync(Id, grantId);
+        SetMessage(ok ? "Concesión revocada." : error ?? "No se pudo revocar.", !ok);
+        if (ok) await OnParametersSetAsync();
+    }
+
+    private void SetMessage(string text, bool error)
+    {
+        _message = text;
+        _isError = error;
+    }
+
+    public sealed class Form
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El nombre es obligatorio.")]
+        public string Name { get; set; } = string.Empty;
+        public string Status { get; set; } = nameof(ClientStatus.PendingValidation);
+    }
+
+    public sealed class GrantForm
+    {
+        public string UserId { get; set; } = string.Empty;
+        public bool View { get; set; } = true;
+        public bool Edit { get; set; }
+        public bool Reveal { get; set; }
+    }
+}
+
+<style>
+    table { border-collapse: collapse; width: 100%; margin-top: .5rem; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .5rem; text-align: left; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    .ok { color: #1B5E20; }
+    section { margin-top: 1.5rem; }
+    input:not([type=checkbox]), select { padding: .4rem; min-width: 18rem; }
+</style>
