@@ -143,10 +143,15 @@ public static class DefaultTemplateSeeder
         if (latestLicense is not null && latestLicense.Fields.All(f => f.Key != "aviso"))
         {
             var fields = latestLicense.Fields.OrderBy(f => f.Order).Select(f =>
-                new FieldDefinition(f.Key, f.Label, f.Type, f.IsRequired, f.Order, f.OptionsJson, f.HelpText)).ToList();
+                new FieldDefinition(f.Key, f.Key == "renovacion" ? "Fecha de finalización" : f.Label,
+                    f.Type, f.IsRequired, f.Order, f.OptionsJson, f.HelpText)).ToList();
 
             fields.Insert(fields.Count - 1, new FieldDefinition("aviso", "Avisar antes de", FieldType.Select,
-                required: false, order: fields.Count, options: Options("7 días", "15 días", "30 días", "60 días", "90 días", "6 meses", "1 año")));
+                required: false, order: 0, options: Options("7 días", "15 días", "30 días", "60 días", "90 días", "6 meses", "1 año")));
+
+            // Renumerar para que el orden sea estable: … fecha, aviso, notas.
+            fields = fields.Select((f, index) => new FieldDefinition(
+                f.Key, f.Label, f.Type, f.IsRequired, index + 1, f.OptionsJson, f.HelpText)).ToList();
 
             db.FormTemplates.Add(new FormTemplate("licencia", latestLicense.Name, latestLicense.Description,
                 fields, latestLicense.Version + 1));

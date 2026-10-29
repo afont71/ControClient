@@ -385,6 +385,43 @@ tr.selected { background: var(--primary-soft) !important; }
     line-height: 1.55;
 }
 
+/* ---------- Formularios de ficha ---------- */
+
+.form-panel {
+    max-width: 880px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.75rem 1.75rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.1rem 1.5rem;
+    margin: 1rem 0;
+}
+
+.field { display: flex; flex-direction: column; gap: .3rem; }
+.field.wide { grid-column: 1 / -1; }
+.field label { display: flex; flex-direction: column; gap: .3rem; }
+.field input:not([type=checkbox]):not([type=radio]),
+.field select,
+.field textarea { width: 100%; }
+.field .checks { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
+.field .inline { display: inline-flex; align-items: center; gap: .35rem; font-weight: 400; color: var(--text); }
+
+.form-actions {
+    display: flex;
+    gap: .6rem;
+    align-items: center;
+    margin-top: 1.25rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border);
+}
+
 /* ---------- Varios ---------- */
 
 .crumbs { font-size: .82rem; color: var(--muted); margin-bottom: .35rem; }

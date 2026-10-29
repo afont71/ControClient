@@ -1,105 +1,141 @@
-﻿@page "/clientes/{ClientId:guid}/fichas/nueva"
+@page "/clientes/{ClientId:guid}/fichas/nueva"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject FormPageService Fichas
-@inject NavigationManager Navigation
+@inject NavigationManager Nav
 
 <PageTitle>Nueva ficha</PageTitle>
 
-<h1>Nueva ficha</h1>
-
-@if (_error is not null)
-{
-    <p class="error">@_error</p>
-}
-
 @if (_templates.Count == 0)
 {
-    <p class="muted">No hay plantillas activas. Un administrador debe crear una.</p>
+    <h1>Nueva ficha</h1>
+    <p class="muted">No hay tipos de ficha activos. Un administrador debe crear uno.</p>
 }
 else
 {
-    <p>
-        <label>Tipo de ficha<br />
-            <select @bind="_templateId" @bind:after="LoadFieldsAsync">
-                <option value="">Selecciona…</option>
-                @foreach (var t in _templates)
-                {
-                    <option value="@t.Id">@t.Name (v@t.Version)</option>
-                }
-            </select>
-        </label>
-    </p>
+    <div class="form-panel">
+        <header class="page-head">
+            <div>
+                <h1>@(_presetName is null ? "Nueva ficha" : $"Nueva {_presetName.ToLowerInvariant()}")</h1>
+                <p class="subtitle">
+                    @(_presetName is null
+                        ? "Elige el tipo y rellena los campos."
+                        : "Rellena los campos y guarda. La ficha quedará asociada al cliente.")
+                </p>
+            </div>
+        </header>
 
-    <p>
-        <label>Título de la ficha *<br />
-            <input @bind="_title" placeholder="Ej. SRV-DC01" />
-        </label>
-    </p>
+        @if (_error is not null)
+        {
+            <p class="error">@_error</p>
+        }
 
-    @if (_fields.Count > 0)
-    {
-        <button @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar ficha")</button>
-    }
-}
-
-@foreach (var field in _fields)
-{
-    <p>
-        <label>
-            @field.Label @(field.Required ? "*" : "")
-            <br />
-            @switch (field.Type)
-            {
-                case "Boolean":
-                    <input type="checkbox" @bind="_bools[field.Key]" />
-                    break;
-                case "Select":
-                    <select @bind="_text[field.Key]">
-                        <option value="">—</option>
-                        @foreach (var option in field.Options)
+        @if (_presetName is null)
+        {
+            <div class="form-grid">
+                <label>
+                    Tipo de ficha
+                    <select @bind="_templateId" @bind:after="LoadFieldsAsync">
+                        <option value="">Selecciona…</option>
+                        @foreach (var t in _templates)
                         {
-                            <option value="@option">@option</option>
+                            <option value="@t.Id">@t.Name</option>
                         }
                     </select>
-                    break;
-                case "MultiSelect":
-                    @foreach (var option in field.Options)
-                    {
-                        <label class="inline">
-                            <input type="checkbox"
-                                   checked="@MultiContains(field.Key, option)"
-                                   @onchange="e => ToggleMulti(field.Key, option, e)" />
-                            @option
+                </label>
+
+                <label>
+                    Título
+                    <input @bind="_title" placeholder="Nombre corto de la ficha" />
+                </label>
+            </div>
+        }
+        else if (_titleField is null)
+        {
+            <div class="form-grid">
+                <label>
+                    Título
+                    <input @bind="_title" placeholder="Nombre corto de la ficha" />
+                </label>
+            </div>
+        }
+
+        @if (_fields.Count > 0)
+        {
+            <div class="form-grid">
+                @foreach (var field in _fields)
+                {
+                    <div class="field @(field.Type is "LongText" ? "wide" : "")">
+                        <label>
+                            @field.Label @(field.Required ? "*" : "")
+                            @switch (field.Type)
+                            {
+                                case "Boolean":
+                                    <input type="checkbox" @bind="_bools[field.Key]" />
+                                    break;
+                                case "Select":
+                                    <select @bind="_text[field.Key]">
+                                        <option value="">—</option>
+                                        @foreach (var option in field.Options)
+                                        {
+                                            <option value="@option">@option</option>
+                                        }
+                                    </select>
+                                    break;
+                                case "MultiSelect":
+                                    <div class="checks">
+                                        @foreach (var option in field.Options)
+                                        {
+                                            <label class="inline">
+                                                <input type="checkbox"
+                                                       checked="@MultiContains(field.Key, option)"
+                                                       @onchange="e => ToggleMulti(field.Key, option, e)" />
+                                                @option
+                                            </label>
+                                        }
+                                    </div>
+                                    break;
+                                case "LongText":
+                                    <textarea class="long-text" rows="8" @bind="_text[field.Key]"></textarea>
+                                    break;
+                                case "Number":
+                                    <input type="number" step="any" @bind="_text[field.Key]" />
+                                    break;
+                                case "Date":
+                                    <input type="date" value="@TextOf(field.Key)" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
+                                    break;
+                                default:
+                                    <input @bind="_text[field.Key]" />
+                                    break;
+                            }
                         </label>
-                    }
-                    break;
-                case "LongText":
-                    <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
-                    break;
-                case "Number":
-                    <input type="number" step="any" @bind="_text[field.Key]" />
-                    break;
-                case "Date":
-                    <input type="date" value="@TextOf(field.Key)" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
-                    break;
-                default:
-                    <input @bind="_text[field.Key]" />
-                    break;
-            }
-        </label>
-        @if (field.HelpText is not null)
-        {
-            <span class="muted">@field.HelpText</span>
+                        @if (field.HelpText is not null)
+                        {
+                            <span class="muted small">@field.HelpText</span>
+                        }
+                        @if (_errors.TryGetValue(field.Key, out var messages))
+                        {
+                            <span class="error small">@string.Join(" ", messages)</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="form-actions">
+                <button class="primary" @onclick="SaveAsync" disabled="@_saving">
+                    @(_saving ? "Guardando…" : "Guardar ficha")
+                </button>
+                <a class="button" href="@($"/datos/{ClientId}")">Cancelar</a>
+            </div>
         }
-        @if (_errors.TryGetValue(field.Key, out var messages))
+        else if (!string.IsNullOrEmpty(_templateId))
         {
-            <span class="error">@string.Join(" ", messages)</span>
+            <p class="muted">El tipo seleccionado no tiene campos.</p>
         }
-    </p>
+    </div>
 }
 
-<p><a href="@($"/clientes/{ClientId}")">Volver al cliente</a></p>
+<p class="crumbs"><a href="@($"/datos/{ClientId}")">Volver a los datos del cliente</a></p>
 
 @code {
     [Parameter] public Guid ClientId { get; set; }
@@ -112,6 +148,8 @@ else
     private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string[]> _errors = new();
     private string _templateId = string.Empty;
+    private string? _presetName;
+    private string? _titleField;
     private string _title = string.Empty;
     private string? _error;
     private bool _saving;
@@ -120,10 +158,15 @@ else
     {
         _templates = await Fichas.TemplatesAsync();
 
-        if (TemplateId is Guid preset && _templates.Any(t => t.Id == preset))
+        if (TemplateId is Guid preset)
         {
-            _templateId = preset.ToString();
-            await LoadFieldsAsync();
+            var template = _templates.FirstOrDefault(t => t.Id == preset);
+            if (template is not null)
+            {
+                _templateId = preset.ToString();
+                _presetName = template.Name;
+                await LoadFieldsAsync();
+            }
         }
     }
 
@@ -134,14 +177,21 @@ else
         _bools.Clear();
         _multi.Clear();
         _errors = new();
+        _titleField = null;
 
         if (!Guid.TryParse(_templateId, out var id))
             return;
 
+        _presetName ??= _templates.FirstOrDefault(t => t.Id == id)?.Name;
         _fields = await Fichas.FieldsAsync(id);
 
-        // Inicializar el diccionario: sin esto, un campo de fecha rompe el render
-        // con KeyNotFoundException al no existir todavía la clave.
+        // Si el tipo tiene un campo que identifica la ficha (producto, nombre,
+        // concepto…), se usa como título y no se pide dos veces.
+        _titleField = _fields
+            .Select(f => f.Key)
+            .FirstOrDefault(k => new[] { "producto", "nombre", "concepto", "dominio", "titulo", "title" }
+                .Contains(k, StringComparer.OrdinalIgnoreCase));
+
         foreach (var field in _fields)
         {
             _text[field.Key] = string.Empty;
@@ -180,32 +230,35 @@ else
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_title))
+        var title = _titleField is not null ? TextOf(_titleField) : _title;
+        if (string.IsNullOrWhiteSpace(title))
         {
-            _error = "El título es obligatorio.";
+            _error = _titleField is not null
+                ? $"El campo «{_fields.First(f => f.Key == _titleField).Label}» es obligatorio."
+                : "El título es obligatorio.";
             return;
         }
 
         _saving = true;
-        _error = null;
         try
         {
             var (recordId, errors, error) = await Fichas.CreateAsync(
-                ClientId, templateId, _title, _fields, _text, _bools, _multi);
+                ClientId, templateId, title, _fields, _text, _bools, _multi);
 
             if (errors is not null)
             {
                 _errors = errors;
+                _error = "Revisa los campos marcados.";
                 return;
             }
 
             if (recordId is null)
             {
-                _error = error;
+                _error = error ?? "No se pudo crear la ficha.";
                 return;
             }
 
-            Navigation.NavigateTo($"/fichas/{recordId}");
+            Nav.NavigateTo($"/datos/{ClientId}");
         }
         finally
         {
