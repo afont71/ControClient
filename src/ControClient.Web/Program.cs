@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
 using ControClient.Infrastructure;
 using ControClient.Web.Components;
@@ -90,13 +91,37 @@ else
 
     // Refuerzo explícito: flujo de código con PKCE (id_token está deshabilitado en
     // el registro) y secreto inyectado aunque el enlace automático falle.
+    var httpLocalDevelopment = builder.Environment.IsDevelopment();
+
     builder.Services.Configure<OpenIdConnectOptions>(
         Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
         options =>
         {
             options.ResponseType = "code";
             options.UsePkce = true;
+
+            if (httpLocalDevelopment)
+            {
+                // En localhost por HTTP no se pueden usar cookies "Secure", así que
+                // form_post perdería el state. Con "query" el retorno es un GET de
+                // navegación y las cookies SameSite=Lax sí viajan.
+                options.ResponseMode = "query";
+                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.NonceCookie.SameSite = SameSiteMode.Lax;
+                options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            }
         });
+
+    if (httpLocalDevelopment)
+    {
+        builder.Services.Configure<CookieAuthenticationOptions>(
+            CookieAuthenticationDefaults.AuthenticationScheme, options =>
+            {
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            });
+    }
 
     builder.Services.Configure<MicrosoftIdentityOptions>(options =>
     {
