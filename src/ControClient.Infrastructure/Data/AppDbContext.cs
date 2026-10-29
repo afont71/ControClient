@@ -1,5 +1,6 @@
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
+using ControClient.Domain.Forms;
 using ControClient.Domain.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +15,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<ClientGrant> Grants => Set<ClientGrant>();
+    public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
+    public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -83,6 +86,57 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => x.ActorObjectId).HasDatabaseName("ix_audit_events_actor");
             e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
                 .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_audit_events_client");
+        });
+
+        modelBuilder.Entity<FormTemplate>(e =>
+        {
+            e.ToTable("form_templates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Key).HasColumnName("key").HasMaxLength(80).IsRequired();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasIndex(x => new { x.Key, x.Version }).IsUnique().HasDatabaseName("ux_form_templates_key_version");
+
+            e.OwnsMany(t => t.Fields, b =>
+            {
+                b.ToTable("field_definitions");
+                b.WithOwner().HasForeignKey("template_id");
+                b.HasKey(f => f.Id);
+                b.Property(f => f.Id).HasColumnName("id");
+                b.Property(f => f.Key).HasColumnName("key").HasMaxLength(80).IsRequired();
+                b.Property(f => f.Label).HasColumnName("label").HasMaxLength(200).IsRequired();
+                b.Property(f => f.Type).HasColumnName("type").HasConversion<int>();
+                b.Property(f => f.IsRequired).HasColumnName("is_required");
+                b.Property(f => f.Order).HasColumnName("order_index");
+                b.Property(f => f.OptionsJson).HasColumnName("options_json");
+                b.Property(f => f.HelpText).HasColumnName("help_text").HasMaxLength(500);
+                b.HasIndex("template_id").HasDatabaseName("ix_field_definitions_template");
+            });
+        });
+
+        modelBuilder.Entity<RecordInstance>(e =>
+        {
+            e.ToTable("record_instances");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.ClientId).HasColumnName("client_id");
+            e.Property(x => x.TemplateId).HasColumnName("template_id");
+            e.Property(x => x.TemplateVersion).HasColumnName("template_version");
+            e.Property(x => x.Title).HasColumnName("title").HasMaxLength(200).IsRequired();
+            e.Property(x => x.ValuesJson).HasColumnName("values_json").HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Version).HasColumnName("row_version").IsConcurrencyToken();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
+            e.HasIndex(x => x.ClientId).HasDatabaseName("ix_record_instances_client");
+            e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_record_instances_client");
+            e.HasOne<FormTemplate>().WithMany().HasForeignKey(x => x.TemplateId)
+                .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_record_instances_template");
         });
     }
 }

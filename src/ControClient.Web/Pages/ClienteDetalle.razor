@@ -1,8 +1,9 @@
-﻿@page "/clientes/{Id:guid}"
+@page "/clientes/{Id:guid}"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
 @attribute [Authorize]
 @inject ClientPageService Clientes
+@inject FormPageService Fichas
 
 <PageTitle>Ficha de cliente</PageTitle>
 
@@ -108,6 +109,36 @@ else
         <p class="muted">Tienes acceso de consulta: no puedes modificar este cliente.</p>
     }
 
+    <section>
+        <h2>Fichas</h2>
+        @if (_records.Count == 0)
+        {
+            <p>Este cliente aún no tiene fichas.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Título</th><th>Tipo</th><th>Versión</th><th>Creada</th></tr></thead>
+                <tbody>
+                    @foreach (var r in _records)
+                    {
+                        <tr>
+                            <td><a href="@($"/fichas/{r.Id}")">@r.Title</a></td>
+                            <td>@r.TemplateName</td>
+                            <td>@r.Version</td>
+                            <td>@r.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (_client.CanEdit)
+        {
+            <p><a class="button" href="@($"/clientes/{Id}/fichas/nueva")">Añadir ficha</a></p>
+        }
+    </section>
+
     <p><a href="/clientes">Volver a clientes</a></p>
 }
 
@@ -117,6 +148,7 @@ else
     private ClientPageService.ClientDetail? _client;
     private IReadOnlyList<ClientPageService.GrantRow> _grants = [];
     private IReadOnlyList<ClientPageService.UserRow> _users = [];
+    private IReadOnlyList<FormPageService.RecordRow> _records = [];
     private readonly Form _form = new();
     private readonly GrantForm _grantForm = new();
     private bool _loading = true;
@@ -134,6 +166,7 @@ else
             _form.Status = _client.Status;
             _grants = await Clientes.GrantsAsync(Id);
             _users = await Clientes.UsersAsync();
+            _records = await Fichas.RecordsAsync(Id);
         }
         _loading = false;
     }

@@ -13,12 +13,14 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Autenticación Microsoft Entra ID + MFA (web y API) | ✅ cableada; falta tenant real |
 | Concesiones por cliente (ver/editar/revelar) | ✅ |
 | Pantallas de clientes (lista, alta, ficha, permisos) | ✅ |
+| Plantillas versionadas y fichas dinámicas con validación | ✅ |
+| Pantallas de fichas (alta, detalle, edición con versión) | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
-| Endpoints de salud, sistema, clientes, usuarios y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 24 |
+| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas y auditoría | ✅ |
+| Pruebas automatizadas | ✅ 33 |
 | CI (build + test) | ✅ |
 
-Pendiente: fichas dinámicas (2), documentación (3), bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
+Pendiente: documentación (3), bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
 
 ## Estructura
 
@@ -60,9 +62,17 @@ Endpoints útiles:
 | `DELETE /api/v1/clients/{id}/grants/{grantId}` | administrador | revoca concesión |
 | `GET /api/v1/users` | administrador | usuarios para conceder permisos |
 | `PATCH /api/v1/users/{id}/role` | administrador | cambia rol (no el propio) |
+| `GET /api/v1/templates` | sesión | plantillas activas (administrador ve todas) |
+| `POST /api/v1/templates` | administrador | nueva versión de plantilla |
+| `GET /api/v1/clients/{id}/records` | ver el cliente | fichas del cliente |
+| `POST /api/v1/clients/{id}/records` | editar el cliente | alta de ficha validada |
+| `GET /api/v1/records/{id}` | ver su cliente | ficha + esquema de la plantilla |
+| `PATCH /api/v1/records/{id}` | editar su cliente | actualización con versión (**409** si cambió) |
 | `GET /api/v1/audit/events` | administrador, auditor o custodio | últimos 50 eventos |
 
 Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar secretos. Se combinan sumando: `3` = ver y editar.
+
+Las plantillas iniciales (`servidor`, `vpn`, `correo`) se siembran al arrancar si no hay ninguna y pueden desactivarse con `Seeding:DefaultTemplates=false`.
 
 ### Simular usuarios en desarrollo
 

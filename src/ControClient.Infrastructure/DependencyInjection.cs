@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddSingleton<IClientAccessPolicy, ClientAccessPolicy>();
         services.AddScoped<IClientAccessService, ClientAccessService>();
         services.AddScoped<IUserProvisioner, UserProvisioner>();
+        services.AddScoped<ControClient.Infrastructure.Forms.FormService>();
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
         return services;

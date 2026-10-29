@@ -1,0 +1,243 @@
+﻿@page "/fichas/{Id:guid}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject FormPageService Fichas
+
+<PageTitle>Ficha</PageTitle>
+
+@if (_loading)
+{
+    <p>Cargando…</p>
+}
+else if (_view is null)
+{
+    <h1>Ficha no disponible</h1>
+    <p class="muted">No existe o no tienes acceso a su cliente.</p>
+}
+else
+{
+    <h1>@_view.Title</h1>
+    <p class="muted">Versión @_view.Version · Cliente @_view.ClientId</p>
+
+    @if (_message is not null)
+    {
+        <p class="@(_isError ? "error" : "ok")">@_message</p>
+    }
+
+    @if (!_editing || !_view.CanEdit)
+    {
+        <table>
+            <tbody>
+                @foreach (var field in _view.Fields)
+                {
+                    <tr>
+                        <th>@field.Label</th>
+                        <td>@DisplayValue(field)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (_view.CanEdit)
+        {
+            <p><button @onclick="StartEdit">Editar ficha</button></p>
+        }
+    }
+    else
+    {
+        <p>
+            <label>Título<br /><input @bind="_title" /></label>
+        </p>
+
+        @foreach (var field in _view.Fields)
+        {
+            <p>
+                <label>
+                    @field.Label @(field.Required ? "*" : "")
+                    <br />
+                    @switch (field.Type)
+                    {
+                        case "Boolean":
+                            <input type="checkbox" @bind="_bools[field.Key]" />
+                            break;
+                        case "Select":
+                            <select @bind="_text[field.Key]">
+                                <option value="">—</option>
+                                @foreach (var option in field.Options)
+                                {
+                                    <option value="@option">@option</option>
+                                }
+                            </select>
+                            break;
+                        case "MultiSelect":
+                            @foreach (var option in field.Options)
+                            {
+                                <label class="inline">
+                                    <input type="checkbox"
+                                           checked="@MultiContains(field.Key, option)"
+                                           @onchange="e => ToggleMulti(field.Key, option, e)" />
+                                    @option
+                                </label>
+                            }
+                            break;
+                        case "LongText":
+                            <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
+                            break;
+                        case "Number":
+                            <input type="number" step="any" @bind="_text[field.Key]" />
+                            break;
+                        case "Date":
+                            <input type="date" value="@_text[field.Key]" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
+                            break;
+                        default:
+                            <input @bind="_text[field.Key]" />
+                            break;
+                    }
+                </label>
+                @if (_errors.TryGetValue(field.Key, out var messages))
+                {
+                    <span class="error">@string.Join(" ", messages)</span>
+                }
+            </p>
+        }
+
+        <button @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar")</button>
+        <button @onclick="CancelEdit">Cancelar</button>
+    }
+
+    <p><a href="@($"/clientes/{_view.ClientId}")">Volver al cliente</a></p>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private FormPageService.RecordView? _view;
+    private readonly Dictionary<string, string?> _text = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> _bools = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string[]> _errors = new();
+    private string _title = string.Empty;
+    private bool _loading = true;
+    private bool _editing;
+    private bool _saving;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _view = await Fichas.GetAsync(Id);
+        _loading = false;
+    }
+
+    private void StartEdit()
+    {
+        if (_view is null) return;
+
+        _text.Clear();
+        _bools.Clear();
+        _multi.Clear();
+        _errors = new();
+        _title = _view.Title;
+
+        foreach (var field in _view.Fields)
+        {
+            if (_view.Text.TryGetValue(field.Key, out var text)) _text[field.Key] = text;
+            if (_view.Bools.TryGetValue(field.Key, out var flag)) _bools[field.Key] = flag;
+            if (_view.Multi.TryGetValue(field.Key, out var list)) _multi[field.Key] = [.. list];
+        }
+
+        _editing = true;
+    }
+
+    private void CancelEdit()
+    {
+        _editing = false;
+        _message = null;
+    }
+
+    private string DisplayValue(FormPageService.FieldInfo field)
+    {
+        if (_view is null) return string.Empty;
+
+        if (_view.Bools.TryGetValue(field.Key, out var flag))
+            return flag ? "Sí" : "No";
+
+        if (_view.Multi.TryGetValue(field.Key, out var list))
+            return list.Count == 0 ? "—" : string.Join(", ", list);
+
+        return _view.Text.TryGetValue(field.Key, out var text) ? text ?? "—" : "—";
+    }
+
+    private bool MultiContains(string key, string option) =>
+        _multi.TryGetValue(key, out var list) && list.Contains(option);
+
+    private void ToggleMulti(string key, string option, ChangeEventArgs args)
+    {
+        if (!_multi.TryGetValue(key, out var list))
+        {
+            list = [];
+            _multi[key] = list;
+        }
+
+        if (args.Value is bool on && on)
+        {
+            if (!list.Contains(option)) list.Add(option);
+        }
+        else
+        {
+            list.Remove(option);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_view is null) return;
+
+        _saving = true;
+        _message = null;
+        try
+        {
+            var (ok, errors, error, conflict) = await Fichas.UpdateAsync(
+                _view.Id, _title, _view.Version, _view.Fields, _text, _bools, _multi);
+
+            if (conflict)
+            {
+                _message = "Otra persona ha modificado la ficha. Recarga para ver la versión actual.";
+                _isError = true;
+                return;
+            }
+
+            if (errors is not null)
+            {
+                _errors = errors;
+                return;
+            }
+
+            if (!ok)
+            {
+                _message = error;
+                _isError = true;
+                return;
+            }
+
+            _editing = false;
+            _view = await Fichas.GetAsync(Id);
+            _message = "Ficha guardada.";
+            _isError = false;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
+
+<style>
+    .error { color: #B00020; margin-left: .5rem; }
+    .ok { color: #1B5E20; }
+    .muted { color: #4B5563; }
+    .inline { margin-right: .75rem; }
+    th { text-align: left; padding: .35rem 1rem .35rem 0; }
+    input:not([type=checkbox]), select, textarea { padding: .4rem; min-width: 18rem; }
+</style>

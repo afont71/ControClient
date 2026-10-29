@@ -1,0 +1,205 @@
+﻿@page "/clientes/{ClientId:guid}/fichas/nueva"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject FormPageService Fichas
+@inject NavigationManager Navigation
+
+<PageTitle>Nueva ficha</PageTitle>
+
+<h1>Nueva ficha</h1>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+
+@if (_templates.Count == 0)
+{
+    <p class="muted">No hay plantillas activas. Un administrador debe crear una.</p>
+}
+else
+{
+    <p>
+        <label>Tipo de ficha<br />
+            <select @bind="_templateId" @bind:after="LoadFieldsAsync">
+                <option value="">Selecciona…</option>
+                @foreach (var t in _templates)
+                {
+                    <option value="@t.Id">@t.Name (v@t.Version)</option>
+                }
+            </select>
+        </label>
+    </p>
+
+    <p>
+        <label>Título de la ficha *<br />
+            <input @bind="_title" placeholder="Ej. SRV-DC01" />
+        </label>
+    </p>
+
+    @if (_fields.Count > 0)
+    {
+        <button @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar ficha")</button>
+    }
+}
+
+@foreach (var field in _fields)
+{
+    <p>
+        <label>
+            @field.Label @(field.Required ? "*" : "")
+            <br />
+            @switch (field.Type)
+            {
+                case "Boolean":
+                    <input type="checkbox" @bind="_bools[field.Key]" />
+                    break;
+                case "Select":
+                    <select @bind="_text[field.Key]">
+                        <option value="">—</option>
+                        @foreach (var option in field.Options)
+                        {
+                            <option value="@option">@option</option>
+                        }
+                    </select>
+                    break;
+                case "MultiSelect":
+                    @foreach (var option in field.Options)
+                    {
+                        <label class="inline">
+                            <input type="checkbox"
+                                   checked="@MultiContains(field.Key, option)"
+                                   @onchange="e => ToggleMulti(field.Key, option, e)" />
+                            @option
+                        </label>
+                    }
+                    break;
+                case "LongText":
+                    <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
+                    break;
+                case "Number":
+                    <input type="number" step="any" @bind="_text[field.Key]" />
+                    break;
+                case "Date":
+                    <input type="date" value="@_text[field.Key]" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
+                    break;
+                default:
+                    <input @bind="_text[field.Key]" />
+                    break;
+            }
+        </label>
+        @if (field.HelpText is not null)
+        {
+            <span class="muted">@field.HelpText</span>
+        }
+        @if (_errors.TryGetValue(field.Key, out var messages))
+        {
+            <span class="error">@string.Join(" ", messages)</span>
+        }
+    </p>
+}
+
+<p><a href="@($"/clientes/{ClientId}")">Volver al cliente</a></p>
+
+@code {
+    [Parameter] public Guid ClientId { get; set; }
+
+    private IReadOnlyList<FormPageService.TemplateRow> _templates = [];
+    private IReadOnlyList<FormPageService.FieldInfo> _fields = [];
+    private readonly Dictionary<string, string?> _text = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> _bools = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string[]> _errors = new();
+    private string _templateId = string.Empty;
+    private string _title = string.Empty;
+    private string? _error;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _templates = await Fichas.TemplatesAsync();
+    }
+
+    private async Task LoadFieldsAsync()
+    {
+        _fields = [];
+        _text.Clear();
+        _bools.Clear();
+        _multi.Clear();
+        _errors = new();
+
+        if (!Guid.TryParse(_templateId, out var id))
+            return;
+
+        _fields = await Fichas.FieldsAsync(id);
+    }
+
+    private bool MultiContains(string key, string option) =>
+        _multi.TryGetValue(key, out var list) && list.Contains(option);
+
+    private void ToggleMulti(string key, string option, ChangeEventArgs args)
+    {
+        if (!_multi.TryGetValue(key, out var list))
+        {
+            list = [];
+            _multi[key] = list;
+        }
+
+        if (args.Value is bool on && on)
+        {
+            if (!list.Contains(option)) list.Add(option);
+        }
+        else
+        {
+            list.Remove(option);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!Guid.TryParse(_templateId, out var templateId))
+        {
+            _error = "Selecciona un tipo de ficha.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_title))
+        {
+            _error = "El título es obligatorio.";
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var (recordId, errors, error) = await Fichas.CreateAsync(
+                ClientId, templateId, _title, _fields, _text, _bools, _multi);
+
+            if (errors is not null)
+            {
+                _errors = errors;
+                return;
+            }
+
+            if (recordId is null)
+            {
+                _error = error;
+                return;
+            }
+
+            Navigation.NavigateTo($"/fichas/{recordId}");
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
+
+<style>
+    .error { color: #B00020; margin-left: .5rem; }
+    .muted { color: #4B5563; }
+    .inline { margin-right: .75rem; }
+    input:not([type=checkbox]), select, textarea { padding: .4rem; min-width: 18rem; }
+</style>
