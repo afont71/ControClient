@@ -38,6 +38,21 @@ public sealed class UserProvisioner(AppDbContext db, IConfiguration configuratio
                 await db.SaveChangesAsync(ct);
                 return pending;
             }
+
+            // Misma persona con otro identificador de Entra (cuenta migrada, alias
+            // o cambio de tenant): se adopta el nuevo oid conservando rol y permisos.
+            var byEmail = await db.Users.FirstOrDefaultAsync(
+                u => u.Email != null && u.Email.ToLower() == normalized && u.EntraObjectId != objectId, ct);
+
+            if (byEmail is not null)
+            {
+                byEmail.LinkEntraIdentity(objectId);
+                byEmail.UpdateProfile(displayName, email);
+                byEmail.Activate();
+                byEmail.RegisterLogin();
+                await db.SaveChangesAsync(ct);
+                return byEmail;
+            }
         }
 
         if (user is null)
