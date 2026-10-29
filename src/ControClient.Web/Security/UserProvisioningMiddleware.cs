@@ -1,12 +1,13 @@
-﻿using ControClient.Domain.Abstractions;
+using ControClient.Domain.Abstractions;
+using ControClient.Domain.Users;
 using ControClient.Web.Security;
 
 namespace ControClient.Web.Security;
 
 /// <summary>
 /// Da de alta al usuario en el primer acceso autenticado, antes de que ninguna
-/// página o endpoint lo necesite. Si el alta falla, la petición sigue: el error
-/// se registrará al usar la aplicación y no se convierte en un 500 de login.
+/// página o endpoint lo necesite. En modo cerrado, una cuenta sin pre-registro
+/// recibe 403 con un mensaje claro en lugar de crear una ficha vacía.
 /// </summary>
 public sealed class UserProvisioningMiddleware(RequestDelegate next)
 {
@@ -20,6 +21,14 @@ public sealed class UserProvisioningMiddleware(RequestDelegate next)
                 try
                 {
                     await provisioner.GetOrCreateAsync(current.ObjectId, current.Name, current.Email);
+                }
+                catch (UnprovisionedUserException ex)
+                {
+                    logger.LogWarning("Acceso rechazado: {Mensaje}", ex.Message);
+                    httpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    httpContext.Response.ContentType = "text/plain; charset=utf-8";
+                    await httpContext.Response.WriteAsync(ex.Message);
+                    return;
                 }
                 catch (Exception ex)
                 {

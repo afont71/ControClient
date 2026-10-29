@@ -24,12 +24,13 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Usuarios: rol, activar/desactivar, grupos | ✅ |
 | Pre-registro por correo antes del primer acceso | ✅ |
 | Eliminar fichas pendientes; desactivar usuarios reales | ✅ |
+| Modo cerrado: solo entra quien está pre-registrado | ✅ |
 | Grupos: miembros y clientes con permisos, asignación masiva | ✅ |
 | Auditoría visible con filtros | ✅ |
 | Contrato OpenAPI en `/openapi/v1.json` | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
 | Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda, búsqueda y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 57 |
+| Pruebas automatizadas | ✅ 60 |
 | CI (build + test) | ✅ |
 
 Conectado el tenant real (login + MFA por política). Pendiente: Android (6) y migración (7).

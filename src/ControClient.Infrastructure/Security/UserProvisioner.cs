@@ -43,9 +43,14 @@ public sealed class UserProvisioner(AppDbContext db, IConfiguration configuratio
         if (user is null)
         {
             var bootstrapAdmin = configuration["Authentication:BootstrapAdminObjectId"];
-            var defaultRole = string.Equals(bootstrapAdmin, objectId, StringComparison.Ordinal)
-                ? AppRole.Administrator
-                : AppRole.ReadOnly;
+            var isBootstrapAdmin = string.Equals(bootstrapAdmin, objectId, StringComparison.Ordinal);
+
+            // Modo cerrado: sin ficha previa ni pre-registro, no se entra.
+            var requirePreRegistration = configuration.GetValue("Authentication:RequirePreRegistration", true);
+            if (requirePreRegistration && !isBootstrapAdmin)
+                throw new UnprovisionedUserException(email ?? objectId);
+
+            var defaultRole = isBootstrapAdmin ? AppRole.Administrator : AppRole.ReadOnly;
 
             user = new AppUser(objectId, displayName, email, defaultRole);
             db.Users.Add(user);

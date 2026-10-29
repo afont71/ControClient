@@ -13,8 +13,49 @@ public class UserProvisionerTests
             .UseInMemoryDatabase($"prov-{Guid.NewGuid():N}")
             .Options);
 
-    private static IConfiguration Config() =>
-        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+    private static IConfiguration Config(string? bootstrap = null, bool requirePreRegistration = false) =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Authentication:BootstrapAdminObjectId"] = bootstrap,
+            ["Authentication:RequirePreRegistration"] = requirePreRegistration.ToString()
+        }).Build();
+
+    [Fact]
+    public async Task En_modo_cerrado_una_cuenta_sin_preregistro_no_entra()
+    {
+        await using var db = Db();
+        var provisioner = new UserProvisioner(db, Config(requirePreRegistration: true));
+
+        await Assert.ThrowsAsync<UnprovisionedUserException>(
+            () => provisioner.GetOrCreateAsync("oid-desconocido", "Intruso", "intruso@ideonetworks.com"));
+
+        Assert.Equal(0, await db.Users.CountAsync());
+    }
+
+    [Fact]
+    public async Task El_administrador_inicial_entra_aunque_el_modo_sea_cerrado()
+    {
+        await using var db = Db();
+        var provisioner = new UserProvisioner(db, Config(bootstrap: "oid-admin", requirePreRegistration: true));
+
+        var user = await provisioner.GetOrCreateAsync("oid-admin", "Jefa", "jefa@ideonetworks.com");
+
+        Assert.Equal(AppRole.Administrator, user.Role);
+    }
+
+    [Fact]
+    public async Task En_modo_cerrado_el_preregistrado_si_entra()
+    {
+        await using var db = Db();
+        db.Users.Add(new AppUser("pending:ana@ideonetworks.com", "Ana", "ana@ideonetworks.com", AppRole.Technician));
+        await db.SaveChangesAsync();
+
+        var provisioner = new UserProvisioner(db, Config(requirePreRegistration: true));
+        var user = await provisioner.GetOrCreateAsync("oid-ana", "Ana", "ana@ideonetworks.com");
+
+        Assert.Equal(AppRole.Technician, user.Role);
+        Assert.False(user.IsPending);
+    }
 
     [Fact]
     public async Task Vincula_la_ficha_preregistrada_por_correo_y_conserva_el_rol()

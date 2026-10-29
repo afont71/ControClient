@@ -121,7 +121,9 @@ public class ClientAccessServiceTests
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Authentication:BootstrapAdminObjectId"] = "oid-admin"
+                ["Authentication:BootstrapAdminObjectId"] = "oid-admin",
+                // Modo abierto: aquí se comprueba el rol por defecto, no el cierre.
+                ["Authentication:RequirePreRegistration"] = "false"
             })
             .Build();
 
