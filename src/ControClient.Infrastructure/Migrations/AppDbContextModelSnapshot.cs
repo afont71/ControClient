@@ -447,6 +447,125 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Vault.VaultItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_archived");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("url");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("username");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId")
+                        .HasDatabaseName("ix_vault_items_client");
+
+                    b.ToTable("vault_items", (string)null);
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Vault.VaultVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<byte[]>("DekNonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("dek_nonce");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("item_id");
+
+                    b.Property<byte[]>("Nonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("nonce");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<byte[]>("WrappedDek")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("wrapped_dek");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ux_vault_versions_item_version");
+
+                    b.ToTable("vault_versions", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Auditing.AuditEvent", b =>
                 {
                     b.HasOne("ControClient.Domain.Clients.Client", null)
@@ -569,7 +688,32 @@ namespace ControClient.Infrastructure.Migrations
                         .HasConstraintName("fk_record_instances_template");
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Vault.VaultItem", b =>
+                {
+                    b.HasOne("ControClient.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_vault_items_client");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Vault.VaultVersion", b =>
+                {
+                    b.HasOne("ControClient.Domain.Vault.VaultItem", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_vault_versions_item");
+                });
+
             modelBuilder.Entity("ControClient.Domain.Documents.Document", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Vault.VaultItem", b =>
                 {
                     b.Navigation("Versions");
                 });

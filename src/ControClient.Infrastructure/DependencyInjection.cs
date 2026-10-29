@@ -45,6 +45,11 @@ public static class DependencyInjection
             return new ControClient.Infrastructure.Storage.DocumentStorage(root);
         });
         services.AddScoped<ControClient.Infrastructure.Documents.DocumentService>();
+
+        // Bóveda: clave maestra protegida con DPAPI y viva solo en memoria (ADR-009).
+        services.AddSingleton<ControClient.Infrastructure.Vault.IVaultKeyProtector, ControClient.Infrastructure.Vault.WindowsDpapiProtector>();
+        services.AddSingleton<ControClient.Infrastructure.Vault.VaultKeyRing>();
+        services.AddScoped<ControClient.Infrastructure.Vault.VaultService>();
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
         return services;

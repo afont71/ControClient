@@ -2,10 +2,12 @@
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
 @using ControClient.Domain.Documents
+@using ControClient.Domain.Vault
 @attribute [Authorize]
 @inject ClientPageService Clientes
 @inject FormPageService Fichas
 @inject DocumentPageService Documentos
+@inject VaultPageService Boveda
 
 <PageTitle>Ficha de cliente</PageTitle>
 
@@ -214,6 +216,80 @@ else
         }
     </section>
 
+    <section>
+        <h2>Bóveda</h2>
+
+        @if (_vaultMessage is not null)
+        {
+            <p class="@(_vaultIsError ? "error" : "ok")">@_vaultMessage</p>
+        }
+
+        @if (!_canReveal)
+        {
+            <p class="muted">Puedes ver la lista; revelar secretos exige rol técnico y permiso explícito.</p>
+        }
+
+        @if (_vaultItems.Count == 0)
+        {
+            <p>Sin credenciales.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Nombre</th><th>Tipo</th><th>Usuario</th><th>Versión</th><th>Actualizada</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var v in _vaultItems)
+                    {
+                        <tr>
+                            <td>@v.Name</td>
+                            <td>@v.Kind</td>
+                            <td>@(v.Username ?? "—")</td>
+                            <td>@v.CurrentVersion</td>
+                            <td>@v.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                            <td>
+                                @if (_canReveal)
+                                {
+                                    @if (_revealed.TryGetValue(v.Id, out var secret))
+                                    {
+                                        <code class="secret">@secret</code>
+                                        <button @onclick="() => Hide(v.Id)">Ocultar</button>
+                                    }
+                                    else
+                                    {
+                                        <button @onclick="() => RevealAsync(v.Id)">Revelar</button>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (_client.CanEdit)
+        {
+            <h3>Nueva credencial</h3>
+            <p><label>Nombre<br /><input @bind="_vaultName" placeholder="Ej. FortiGate sede" /></label></p>
+            <p>
+                <label>Tipo<br />
+                    <select @bind="_vaultKind">
+                        @foreach (var kind in Enum.GetNames<VaultItemKind>())
+                        {
+                            <option value="@kind">@kind</option>
+                        }
+                    </select>
+                </label>
+            </p>
+            <p><label>Usuario<br /><input @bind="_vaultUser" /></label></p>
+            <p><label>URL<br /><input @bind="_vaultUrl" placeholder="https://" /></label></p>
+            <p><label>Notas (no secretas)<br /><input @bind="_vaultNotes" /></label></p>
+            <p><label>Secreto<br /><input type="password" @bind="_vaultSecret" /></label></p>
+            <button @onclick="CreateVaultItemAsync" disabled="@_vaultSaving">
+                @(_vaultSaving ? "Guardando…" : "Guardar credencial")
+            </button>
+        }
+    </section>
+
     <p><a href="/clientes">Volver a clientes</a></p>
 }
 
@@ -225,6 +301,18 @@ else
     private IReadOnlyList<ClientPageService.UserRow> _users = [];
     private IReadOnlyList<FormPageService.RecordRow> _records = [];
     private IReadOnlyList<DocumentPageService.DocumentRow> _documents = [];
+    private IReadOnlyList<VaultPageService.ItemRow> _vaultItems = [];
+    private readonly Dictionary<Guid, string> _revealed = [];
+    private bool _canReveal;
+    private string? _vaultName;
+    private string _vaultKind = nameof(VaultItemKind.Password);
+    private string? _vaultUser;
+    private string? _vaultUrl;
+    private string? _vaultNotes;
+    private string? _vaultSecret;
+    private string? _vaultMessage;
+    private bool _vaultIsError;
+    private bool _vaultSaving;
     private IBrowserFile? _file;
     private string? _docName;
     private DocumentClassification _classification = DocumentClassification.Internal;
@@ -252,6 +340,9 @@ else
             _users = await Clientes.UsersAsync();
             _records = await Fichas.RecordsAsync(Id);
             _documents = await Documentos.ListAsync(Id);
+            var vault = await Boveda.ListAsync(Id);
+            _vaultItems = vault.Items;
+            _canReveal = vault.CanReveal;
         }
         _loading = false;
     }
@@ -381,6 +472,57 @@ else
         >= 1024 => $"{bytes / 1024.0:0} KB",
         _ => $"{bytes} B"
     };
+
+    private async Task RevealAsync(Guid itemId)
+    {
+        var (secret, error) = await Boveda.RevealAsync(itemId);
+        if (secret is null)
+        {
+            SetVault(error ?? "No se pudo revelar.", true);
+            return;
+        }
+
+        _revealed[itemId] = secret;
+        _vaultMessage = null;
+    }
+
+    private void Hide(Guid itemId) => _revealed.Remove(itemId);
+
+    private async Task CreateVaultItemAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_vaultName) || string.IsNullOrWhiteSpace(_vaultSecret))
+        {
+            SetVault("Nombre y secreto son obligatorios.", true);
+            return;
+        }
+
+        _vaultSaving = true;
+        try
+        {
+            var (ok, error) = await Boveda.CreateAsync(Id, _vaultName!, _vaultKind, _vaultUser, _vaultUrl, _vaultNotes, _vaultSecret!);
+            if (!ok)
+            {
+                SetVault(error ?? "No se pudo guardar.", true);
+                return;
+            }
+
+            SetVault("Credencial guardada.", false);
+            _vaultName = _vaultUser = _vaultUrl = _vaultNotes = _vaultSecret = null;
+            var vault = await Boveda.ListAsync(Id);
+            _vaultItems = vault.Items;
+            _canReveal = vault.CanReveal;
+        }
+        finally
+        {
+            _vaultSaving = false;
+        }
+    }
+
+    private void SetVault(string text, bool error)
+    {
+        _vaultMessage = text;
+        _vaultIsError = error;
+    }
 
     public sealed class Form
     {

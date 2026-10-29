@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ControClient.Infrastructure;
 using ControClient.Web.Components;
 using ControClient.Web.Endpoints;
@@ -40,6 +40,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ControClient.Web.Pages.ClientPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.FormPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.DocumentPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.VaultPageService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
@@ -113,6 +114,7 @@ app.MapSystemEndpoints();
 app.MapClientEndpoints();
 app.MapFormEndpoints();
 app.MapDocumentEndpoints();
+ app.MapVaultEndpoints();
 
 // Plantillas iniciales (idempotente). En producción puede desactivarse por configuración.
 if (app.Configuration.GetValue("Seeding:DefaultTemplates", true))

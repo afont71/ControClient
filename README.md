@@ -17,12 +17,15 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Pantallas de fichas (alta, detalle, edición con versión) | ✅ |
 | Documentos con hash SHA-256, versiones y descarga auditada | ✅ |
 | Subida desde la ficha del cliente con clasificación | ✅ |
+| Bóveda: constitución, desellado por administrador, revelado y recuperación | ✅ |
+| Cifrado por envoltura (DEK por secreto) y clave protegida con DPAPI | ✅ |
+| Pantallas de bóveda (estado y credenciales por cliente) | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
-| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 37 |
+| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda y auditoría | ✅ |
+| Pruebas automatizadas | ✅ 45 |
 | CI (build + test) | ✅ |
 
-Pendiente: bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
+Pendiente: búsqueda y OpenAPI (5), Android (6), migración (7).
 
 ## Estructura
 
@@ -75,9 +78,17 @@ Endpoints útiles:
 | `GET /api/v1/documents/{id}` | ver su cliente | documento con todas las versiones |
 | `POST /api/v1/documents/{id}/versions` | editar su cliente | nueva versión (`file`) |
 | `GET /api/v1/documents/{id}/content?version=` | ver su cliente | descarga desde el almacén, auditada |
+| `GET /api/v1/vault/status` | sesión | constituida, sellada, nº de credenciales |
+| `POST /api/v1/vault/initialize` | administrador con MFA | constituye la bóveda y devuelve el sobre **una vez** |
+| `POST /api/v1/vault/unseal` / `lock` | administrador con MFA | desella o sella en memoria |
+| `POST /api/v1/vault/recover` | administrador con MFA | reconstituye con el sobre y rota la clave |
+| `GET /api/v1/clients/{id}/vault-items` | ver el cliente | credenciales (solo metadatos) |
+| `POST /api/v1/clients/{id}/vault-items` | editar el cliente | crea credencial cifrada |
+| `POST /api/v1/vault-items/{id}/versions` | editar el cliente | nueva versión del secreto |
+| `POST /api/v1/vault-items/{id}/reveal` | rol técnico/custodio **y** concesión `RevealSecret` | devuelve el secreto y audita el revelado |
 | `GET /api/v1/audit/events` | administrador, auditor o custodio | últimos 50 eventos |
 
-Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar secretos. Se combinan sumando: `3` = ver y editar.
+Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar secretos. Se combinan sumando: `3` = ver y editar; `7` = todo.
 
 ### Documentos
 
@@ -88,6 +99,16 @@ Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar 
 - Cada descarga queda auditada con actor, cliente, documento y versión.
 
 Las plantillas iniciales (`servidor`, `vpn`, `correo`) se siembran al arrancar si no hay ninguna y pueden desactivarse con `Seeding:DefaultTemplates=false`.
+
+### Bóveda
+
+- **Cifrado por envoltura:** una DEK por secreto (AES-256-GCM) envuelta con la clave maestra (KEK). La KEK nunca se guarda en claro ni en la base.
+- **Protección en reposo:** la KEK se guarda cifrada con **DPAPI de equipo** (`Vault:KeyFile`, por defecto `%LOCALAPPDATA%\ControClient\vault\kek.bin`). El fichero no sirve en otra máquina. TPM queda como mejora.
+- **Desellado:** un administrador con MFA desella; la clave vive solo en memoria y se pierde al reiniciar. Sin desellar, revelar y crear devuelven **423**.
+- **Separación de deberes:** un administrador **no** puede revelar secretos por su rol: hace falta rol técnico o custodio **y** concesión `RevealSecret` sobre el cliente.
+- **Recuperación:** en la constitución se muestra una única vez el sobre (base64). `POST /vault/recover` valida el sobre, reenvuelve todas las DEK con una KEK nueva y devuelve un sobre nuevo; el anterior deja de servir.
+- **Estado actual:** el algoritmo es AES-256-GCM porque .NET no incluye XChaCha20 (ADR-001); debe anotarse en la especificación como sustitución equivalente AEAD.
+- **No implementado todavía:** caducidad de credenciales, rotación programada, exportación controlada y doble control en la recuperación. Tampoco hay antivirus ni cuarentena.
 
 ### Simular usuarios en desarrollo
 

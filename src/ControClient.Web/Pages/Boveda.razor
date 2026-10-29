@@ -1,0 +1,135 @@
+﻿@page "/boveda"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject VaultPageService Servicio
+
+<PageTitle>Bóveda</PageTitle>
+
+<h1>Bóveda</h1>
+
+@if (_status is null)
+{
+    <p>Cargando…</p>
+}
+else
+{
+    <table>
+        <tbody>
+            <tr><th>Constituida</th><td>@(_status.Initialized ? "Sí" : "No")</td></tr>
+            <tr><th>Estado</th><td>@(_status.Unsealed ? "Desellada" : "Sellada")</td></tr>
+            <tr><th>Credenciales</th><td>@_status.Items</td></tr>
+            <tr><th>Protección de la clave</th><td>@_status.Protection</td></tr>
+        </tbody>
+    </table>
+
+    @if (_message is not null)
+    {
+        <p class="@(_isError ? "error" : "ok")">@_message</p>
+    }
+
+    @if (_recoveryCode is not null)
+    {
+        <section class="recovery">
+            <h2>Sobre de recuperación</h2>
+            <p><strong>Guárdalo ahora.</strong> No se volverá a mostrar.</p>
+            <code>@_recoveryCode</code>
+            <p class="muted">Imprímelo, séllalo y guárdalo en un lugar distinto del servidor. Cualquiera con este valor puede reconstituir la bóveda.</p>
+            <button @onclick="() => _recoveryCode = null">Ya lo he guardado</button>
+        </section>
+    }
+
+    @if (!_status.Initialized)
+    {
+        <p>La bóveda no está constituida. Al crearla se generará la clave y el sobre de recuperación.</p>
+        <button @onclick="InitializeAsync" disabled="@_busy">Constituir bóveda</button>
+    }
+    else if (!_status.Unsealed)
+    {
+        <button @onclick="UnsealAsync" disabled="@_busy">Desellar bóveda</button>
+    }
+    else
+    {
+        <button @onclick="LockAsync" disabled="@_busy">Sellar bóveda</button>
+    }
+}
+
+<p class="muted">El sellado se aplica también tras reiniciar el servidor: hay que desellar de nuevo con un administrador.</p>
+
+@code {
+    private VaultPageService.Status? _status;
+    private string? _recoveryCode;
+    private string? _message;
+    private bool _isError;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _status = await Servicio.StatusAsync();
+
+    private async Task InitializeAsync()
+    {
+        _busy = true;
+        try
+        {
+            var (code, error) = await Servicio.InitializeAsync();
+            if (code is null)
+            {
+                SetMessage(error ?? "No se pudo constituir.", true);
+                return;
+            }
+
+            _recoveryCode = code;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UnsealAsync()
+    {
+        _busy = true;
+        try
+        {
+            var (ok, error) = await Servicio.UnsealAsync();
+            SetMessage(ok ? "Bóveda desellada." : error ?? "No se pudo desellar.", !ok);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task LockAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Servicio.LockAsync();
+            SetMessage("Bóveda sellada.", false);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SetMessage(string text, bool error)
+    {
+        _message = text;
+        _isError = error;
+    }
+}
+
+<style>
+    table { border-collapse: collapse; }
+    th { text-align: left; padding: .35rem 1rem .35rem 0; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    .ok { color: #1B5E20; }
+    .recovery { border: 1px solid #B00020; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .recovery code { font-size: 1.1rem; word-break: break-all; }
+</style>

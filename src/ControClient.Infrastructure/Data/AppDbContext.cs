@@ -3,6 +3,7 @@ using ControClient.Domain.Clients;
 using ControClient.Domain.Documents;
 using ControClient.Domain.Forms;
 using ControClient.Domain.Users;
+using ControClient.Domain.Vault;
 using Microsoft.EntityFrameworkCore;
 
 namespace ControClient.Infrastructure.Data;
@@ -19,6 +20,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<Document> Documents => Set<Document>();
+    public DbSet<VaultItem> VaultItems => Set<VaultItem>();
+    public DbSet<VaultVersion> VaultVersions => Set<VaultVersion>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -178,6 +181,45 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.ScanStatus).HasColumnName("scan_status").HasConversion<int>();
             e.HasIndex(x => new { x.DocumentId, x.Version }).IsUnique().HasDatabaseName("ux_document_versions_document_version");
             e.HasIndex(x => x.Sha256).HasDatabaseName("ix_document_versions_sha256");
+        });
+
+        modelBuilder.Entity<VaultItem>(e =>
+        {
+            e.ToTable("vault_items");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.ClientId).HasColumnName("client_id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Kind).HasColumnName("kind").HasConversion<int>();
+            e.Property(x => x.Username).HasColumnName("username").HasMaxLength(200);
+            e.Property(x => x.Url).HasColumnName("url").HasMaxLength(500);
+            e.Property(x => x.Notes).HasColumnName("notes").HasMaxLength(2000);
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.Property(x => x.IsArchived).HasColumnName("is_archived");
+            e.HasIndex(x => x.ClientId).HasDatabaseName("ix_vault_items_client");
+            e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_vault_items_client");
+            e.HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.ItemId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_vault_versions_item");
+        });
+
+        modelBuilder.Entity<VaultVersion>(e =>
+        {
+            e.ToTable("vault_versions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.ItemId).HasColumnName("item_id");
+            e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.Nonce).HasColumnName("nonce").HasColumnType("bytea").IsRequired();
+            e.Property(x => x.Ciphertext).HasColumnName("ciphertext").HasColumnType("bytea").IsRequired();
+            e.Property(x => x.DekNonce).HasColumnName("dek_nonce").HasColumnType("bytea").IsRequired();
+            e.Property(x => x.WrappedDek).HasColumnName("wrapped_dek").HasColumnType("bytea").IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
+            e.Property(x => x.Comment).HasColumnName("comment").HasMaxLength(500);
+            e.HasIndex(x => new { x.ItemId, x.Version }).IsUnique().HasDatabaseName("ux_vault_versions_item_version");
         });
     }
 }
