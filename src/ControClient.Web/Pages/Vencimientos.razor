@@ -1,15 +1,48 @@
-﻿@page "/vencimientos"
+@page "/vencimientos"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject ExpirationsPageService Servicio
+@inject ClientPageService Clientes
+@inject FormPageService Fichas
+@inject NavigationManager Nav
 
 <PageTitle>Vencimientos</PageTitle>
 
 <h1>Vencimientos</h1>
-<p class="muted">Licencias, garantías y renovaciones que vencen en el horizonte elegido. Lo vencido aparece primero, en rojo.</p>
+<p class="muted">
+    Licencias, garantías, contratos y renovaciones que vencen en el horizonte elegido.
+    Lo vencido aparece primero, en rojo.
+</p>
 
-<p>
-    <label>Horizonte<br />
+<section>
+    <h2>Añadir vencimiento</h2>
+    <p class="muted">
+        Se guarda como una ficha del cliente con su fecha. En cuanto tenga fecha,
+        aparece aquí solo, sin duplicar datos.
+    </p>
+    <div class="toolbar">
+        <label>Cliente
+            <select @bind="_clientId">
+                <option value="">Selecciona un cliente…</option>
+                @foreach (var c in _clients)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+        </label>
+        <button class="primary" @onclick="AddAsync" disabled="@(!CanAdd)">+ Añadir vencimiento</button>
+    </div>
+    @if (_templateId is null)
+    {
+        <p class="muted">
+            No existe el tipo «Vencimiento». Un administrador puede crearlo en
+            <a href="/plantillas">Tipos</a> con un campo de fecha.
+        </p>
+    }
+</section>
+
+<div class="toolbar">
+    <label>Horizonte
         <select @bind="_horizon" @bind:after="LoadAsync">
             <option value="30">30 días</option>
             <option value="90">90 días</option>
@@ -18,7 +51,7 @@
         </select>
     </label>
     <button @onclick="LoadAsync" disabled="@_loading">Actualizar</button>
-</p>
+</div>
 
 @if (_rows is null)
 {
@@ -26,7 +59,7 @@
 }
 else if (_rows.Count == 0)
 {
-    <p>Nada vence en ese horizonte.</p>
+    <p class="empty">Nada vence en ese horizonte.</p>
 }
 else
 {
@@ -51,15 +84,38 @@ else
 
 @code {
     private IReadOnlyList<ExpirationsPageService.Row>? _rows;
+    private IReadOnlyList<ClientPageService.ClientRow> _clients = [];
+    private Guid? _templateId;
+    private string _clientId = string.Empty;
     private int _horizon = 90;
     private bool _loading;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private bool CanAdd => _templateId is not null && Guid.TryParse(_clientId, out _);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var (clients, _) = await Clientes.ListAsync(null, 1, 200);
+        _clients = clients;
+
+        var templates = await Fichas.TemplatesAsync();
+        _templateId = templates.FirstOrDefault(t =>
+            string.Equals(t.Key, "vencimiento", StringComparison.OrdinalIgnoreCase))?.Id;
+
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
         _loading = true;
         try { _rows = await Servicio.ListAsync(_horizon); }
         finally { _loading = false; }
+    }
+
+    private void AddAsync()
+    {
+        if (!Guid.TryParse(_clientId, out var clientId) || _templateId is null)
+            return;
+
+        Nav.NavigateTo($"/clientes/{clientId}/fichas/nueva?templateId={_templateId}");
     }
 }

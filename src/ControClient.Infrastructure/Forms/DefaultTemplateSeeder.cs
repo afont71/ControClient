@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using ControClient.Domain.Forms;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -127,6 +127,19 @@ public static class DefaultTemplateSeeder
                 new FieldDefinition("rango", "Rango", FieldType.Text, order: 2),
                 new FieldDefinition("vlan", "VLAN", FieldType.Text, order: 3),
                 new FieldDefinition("gateway", "Gateway", FieldType.Ip, order: 4),
+                new FieldDefinition("notas", "Notas", FieldType.LongText, order: 5)
+            ]));
+        }
+
+        if (!keys.Contains("vencimiento"))
+        {
+            Add(new FormTemplate("vencimiento", "Vencimiento", "Fecha a vigilar: contrato, dominio, certificado, licencia…",
+            [
+                new FieldDefinition("concepto", "Concepto", FieldType.Text, required: true, order: 1),
+                new FieldDefinition("tipo", "Tipo", FieldType.Select, required: true, order: 2,
+                    options: Options("Contrato", "Dominio", "Certificado SSL", "Licencia", "Seguro", "Otro")),
+                new FieldDefinition("fecha", "Fecha de vencimiento", FieldType.Date, required: true, order: 3),
+                new FieldDefinition("responsable", "Responsable", FieldType.Email, order: 4),
                 new FieldDefinition("notas", "Notas", FieldType.LongText, order: 5)
             ]));
         }
