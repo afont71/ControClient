@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+artifacts/
+*.log
+appsettings.*.local.json
+.env
+.DS_Store
+Thumbs.db

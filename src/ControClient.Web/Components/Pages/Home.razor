@@ -1,0 +1,58 @@
+@page "/"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize]
+@inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Gestión de clientes IT</PageTitle>
+
+<h1>Control de clientes IT</h1>
+
+<p class="lead">
+    @if (string.IsNullOrEmpty(_userName))
+    {
+        <text>Comprobando sesión…</text>
+    }
+    else
+    {
+        <text>Sesión iniciada como <strong>@_userName</strong>.</text>
+    }
+</p>
+
+<div class="cards">
+    <section class="card">
+        <h2>Clientes</h2>
+        <p>Alta, consulta y permisos por cliente. Disponible a partir de la etapa 1.</p>
+        <a href="/api/v1/clients">Ver API de clientes</a>
+    </section>
+
+    <section class="card">
+        <h2>Bóveda</h2>
+        <p><span class="badge">Sellada</span> El desellado por administrador llega en la etapa 4.</p>
+    </section>
+
+    <section class="card">
+        <h2>Estado del servicio</h2>
+        <p>Comprobación técnica: <a href="/health">/health</a></p>
+        <p>Modo de autenticación: <code>@Configuration["Authentication:Mode"]</code></p>
+    </section>
+</div>
+
+@code {
+    private string? _userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userName = state.User.Identity?.IsAuthenticated == true
+            ? state.User.Identity!.Name
+            : null;
+    }
+}
+
+<style>
+    .cards { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .card { border: 1px solid #E1E7EF; border-radius: 8px; padding: 1rem; max-width: 22rem; }
+    .badge { background: #F2F4F8; border-radius: 6px; padding: 0.1rem 0.5rem; font-weight: 600; }
+</style>
