@@ -32,7 +32,16 @@ else
                 {
                     <tr>
                         <th>@field.Label</th>
-                        <td>@DisplayValue(field)</td>
+                        <td>
+                            @if (field.Type == "LongText")
+                            {
+                                <div class="multiline">@DisplayValue(field)</div>
+                            }
+                            else
+                            {
+                                @DisplayValue(field)
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>

@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    ControClient · sistema de diseño
    Tokens, layout, tablas tipo datagrid y componentes.
    ============================================================ */
@@ -376,6 +376,14 @@ tr.overdue { background: var(--danger-soft) !important; }
 tr.soon { background: var(--warning-soft) !important; }
 tr.inactive { color: #94A3B8; }
 tr.selected { background: var(--primary-soft) !important; }
+
+/* Texto largo en modo lectura: conserva saltos de línea y espacios */
+.multiline {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-width: 70ch;
+    line-height: 1.55;
+}
 
 /* ---------- Varios ---------- */
 
