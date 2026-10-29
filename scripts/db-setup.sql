@@ -16,6 +16,7 @@ CREATE DATABASE contoclient
 -- El esquema deja de ser público: solo el dueño crea objetos.
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO contoclient_owner;
+GRANT USAGE ON SCHEMA public TO contoclient_app;
 GRANT CONNECT ON DATABASE contoclient TO contoclient_app;
 
 -- La aplicación solo puede leer y escribir datos, nunca cambiar el esquema.
