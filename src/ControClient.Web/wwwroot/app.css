@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    ControClient · sistema de diseño
    Tokens, layout, tablas tipo datagrid y componentes.
    ============================================================ */
@@ -280,43 +280,8 @@ input[type=checkbox], input[type=radio] { width: 16px; height: 16px; accent-colo
 
 label { font-size: .85rem; font-weight: 600; color: var(--muted); }
 label input, label select, label textarea { display: block; margin-top: .3rem; font-weight: 400; }
-label > input:not([type=checkbox]):not([type=radio]),
-label > select { width: 100%; }
 
 fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
-
-/* Campos de texto largo: rectángulo amplio y redimensionable */
-textarea {
-    width: 100%;
-    min-height: 11rem;
-    resize: vertical;
-    line-height: 1.5;
-}
-
-textarea.long-text {
-    min-height: 14rem;
-    font-size: .95rem;
-}
-
-label textarea { width: 100%; }
-
-/* Rejilla para formularios de definición */
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem 1.25rem;
-    margin-bottom: 1rem;
-}
-
-.form-grid label { display: flex; flex-direction: column; }
-.form-grid input, .form-grid select, .form-grid textarea { width: 100%; }
-
-.form-grid.wide { grid-template-columns: 1fr; }
-
-/* Un campo de texto largo ocupa toda la fila */
-.form-grid .wide { grid-column: 1 / -1; }
-.form-grid p { margin: 0; }
-.form-grid .wide textarea { min-height: 16rem; }
 
 .toolbar {
     display: flex;
