@@ -63,6 +63,11 @@ Esta es una herramienta **interna de Ideo Networks**:
 Consecuencia práctica en el portal: en **Aplicaciones empresariales → Propiedades**
 marca «¿Se requiere asignación?» y asigna únicamente el grupo del personal.
 
+## Interfaz
+
+Sistema de diseño propio en wwwroot/app.css: sidebar, tipografía, tablas tipo
+datagrid, botones con estados, tarjetas y badges. Sin dependencias externas.
+
 ## Estructura
 
 ```

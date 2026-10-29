@@ -9,7 +9,7 @@
 
 <div class="toolbar">
     <input type="search" placeholder="Buscar por nombre o alias…" @bind="_query" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
-    <a class="button" href="/clientes/nuevo">Nuevo cliente</a>
+    <a class="button primary" href="/clientes/nuevo">+ Nuevo cliente</a>
 </div>
 
 @if (_error is not null)
@@ -37,7 +37,7 @@ else
                 <tr>
                     <td><a href="@($"/clientes/{item.Id}")">@item.Name</a></td>
                     <td>@item.Alias</td>
-                    <td>@item.Status</td>
+                    <td><span class="badge @Ui.StatusBadge(item.Status)">@Ui.StatusLabel(item.Status)</span></td>
                     <td>@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
                 </tr>
             }
@@ -99,14 +99,3 @@ else
         if (_page < TotalPages) { _page++; await LoadAsync(); }
     }
 }
-
-<style>
-    .toolbar { display: flex; gap: .75rem; align-items: center; margin: 1rem 0; }
-    .toolbar input { flex: 1; max-width: 26rem; padding: .5rem; }
-    .button { background: #006EB3; color: #fff; padding: .5rem .9rem; border-radius: 6px; text-decoration: none; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid #E1E7EF; padding: .5rem; text-align: left; }
-    .pager { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
-    .muted { color: #4B5563; }
-    .error { color: #B00020; }
-</style>

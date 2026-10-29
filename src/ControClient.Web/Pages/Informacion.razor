@@ -1,4 +1,4 @@
-@page "/informacion"
+﻿@page "/informacion"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject InfoPageService Info
@@ -91,11 +91,3 @@ else
         }
     }
 }
-
-<style>
-    .filters { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid #E1E7EF; padding: .4rem; text-align: left; }
-    .muted { color: #4B5563; }
-    input, select { padding: .35rem; }
-</style>

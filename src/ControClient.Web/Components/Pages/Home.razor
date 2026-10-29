@@ -1,65 +1,52 @@
-@page "/"
+﻿@page "/"
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize]
 @inject IConfiguration Configuration
-@inject AuthenticationStateProvider AuthenticationStateProvider
 
-<PageTitle>Gestión de clientes IT</PageTitle>
+<PageTitle>Inicio</PageTitle>
 
-<h1>Control de clientes IT</h1>
-
-<p class="lead">
-    @if (string.IsNullOrEmpty(_userName))
-    {
-        <text>Comprobando sesión…</text>
-    }
-    else
-    {
-        <text>Sesión iniciada como <strong>@_userName</strong>.</text>
-    }
-</p>
+<div class="page-head">
+    <div>
+        <h1>Gestión de clientes IT</h1>
+        <p class="subtitle">Consulta y administra la información de tus clientes.</p>
+    </div>
+</div>
 
 <div class="cards">
     <section class="card">
         <h2>Clientes</h2>
-        <p>Alta, consulta, permisos por cliente, fichas técnicas y documentación.</p>
-        <a href="/clientes">Ir a clientes</a>
+        <p>Alta de empresas, datos fiscales y documentación.</p>
+        <a class="button primary" href="/clientes">Abrir clientes</a>
     </section>
 
     <section class="card">
-        <h2>Bóveda</h2>
-        <p><span class="badge">Sellada</span> Desellado por administrador con MFA; el revelado requiere permiso explícito.</p>
-        <a href="/boveda">Estado de la bóveda</a>
+        <h2>Datos</h2>
+        <p>Fichas por cliente: equipos, servidores, redes, licencias y contactos.</p>
+        <a class="button primary" href="/datos">Consultar datos</a>
     </section>
 
     <section class="card">
-        <h2>Buscar</h2>
-        <p>Búsqueda global en clientes, fichas, documentos y credenciales (sin secretos).</p>
-        <a href="/buscar">Buscar</a>
+        <h2>Vencimientos</h2>
+        <p>Renovaciones y garantías próximas, ordenadas por fecha.</p>
+        <a class="button" href="/vencimientos">Ver vencimientos</a>
     </section>
 
     <section class="card">
-        <h2>Estado del servicio</h2>
-        <p>Comprobación técnica: <a href="/health">/health</a></p>
-        <p>Autenticación: <code>@Configuration["Authentication:Mode"]</code></p>
+        <h2>Búsqueda</h2>
+        <p>Encuentra un cliente, una ficha o un documento por su contenido.</p>
+        <a class="button" href="/buscar">Buscar</a>
     </section>
 </div>
 
-@code {
-    private string? _userName;
+<section>
+    <h2>Estado del servicio</h2>
+    <p class="muted">
+        Comprobación técnica en <a href="/health">/health</a>.
+        Autenticación: <span class="badge">@Configuration["Authentication:Mode"]</span>
+    </p>
+    <p class="muted">
+        Recuerda cerrar sesión con <strong>Salir</strong> si usas un equipo compartido.
+    </p>
+</section>
 
-    protected override async Task OnInitializedAsync()
-    {
-        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        _userName = state.User.Identity?.IsAuthenticated == true
-            ? state.User.Identity!.Name
-            : null;
-    }
-}
 
-<style>
-    .cards { display: flex; gap: 1rem; flex-wrap: wrap; }
-    .card { border: 1px solid #E1E7EF; border-radius: 8px; padding: 1rem; max-width: 22rem; }
-    .badge { background: #F2F4F8; border-radius: 6px; padding: 0.1rem 0.5rem; font-weight: 600; }
-</style>

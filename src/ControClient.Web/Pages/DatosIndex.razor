@@ -1,4 +1,4 @@
-@page "/datos"
+﻿@page "/datos"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject ClientPageService Servicio
@@ -8,10 +8,10 @@
 <h1>Datos de clientes</h1>
 <p class="muted">Selecciona un cliente para consultar, añadir o modificar su información: equipos, redes, servidores, licencias, contactos…</p>
 
-<p>
+<div class="toolbar">
     <input @bind="_query" placeholder="Buscar cliente…" @bind:event="oninput" />
     <button @onclick="LoadAsync">Buscar</button>
-</p>
+</div>
 
 @if (_clients.Count == 0)
 {
@@ -27,8 +27,8 @@ else
                 <tr>
                     <td><strong>@c.Name</strong></td>
                     <td>@(c.Alias ?? "—")</td>
-                    <td>@c.Status</td>
-                    <td><a class="button" href="@($"/datos/{c.Id}")">Abrir datos</a></td>
+                    <td><span class="badge @Ui.StatusBadge(c.Status)">@Ui.StatusLabel(c.Status)</span></td>
+                    <td><a class="button small primary" href="@($"/datos/{c.Id}")">Abrir datos</a></td>
                 </tr>
             }
         </tbody>

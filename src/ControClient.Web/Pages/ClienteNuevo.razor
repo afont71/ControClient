@@ -1,4 +1,4 @@
-@page "/clientes/nuevo"
+﻿@page "/clientes/nuevo"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject ClientPageService Clientes
@@ -68,9 +68,3 @@
         }
     }
 }
-
-<style>
-    .error { color: #B00020; }
-    .muted { color: #4B5563; }
-    input[type=text], input:not([type]) { padding: .5rem; min-width: 20rem; }
-</style>
