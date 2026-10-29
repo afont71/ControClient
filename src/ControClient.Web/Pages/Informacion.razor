@@ -1,0 +1,101 @@
+@page "/informacion"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject InfoPageService Info
+
+<PageTitle>Información</PageTitle>
+
+<h1>Información de clientes</h1>
+
+<p class="muted">Todas las fichas de los clientes a los que tienes acceso.</p>
+
+<p class="filters">
+    <label>Buscar<br /><input @bind="_text" placeholder="título, tipo o cliente" /></label>
+    <label>Tipo<br />
+        <select @bind="_templateId">
+            <option value="">Todos</option>
+            @foreach (var t in _templates)
+            {
+                <option value="@t.Id">@t.Name</option>
+            }
+        </select>
+    </label>
+    <label>Cliente<br />
+        <select @bind="_clientId">
+            <option value="">Todos</option>
+            @foreach (var c in _clients)
+            {
+                <option value="@c.Id">@c.Name</option>
+            }
+        </select>
+    </label>
+    <button @onclick="LoadAsync" disabled="@_loading">Filtrar</button>
+</p>
+
+@if (_rows is null)
+{
+    <p>Sin sesión válida.</p>
+}
+else if (_rows.Count == 0)
+{
+    <p>Sin información para ese filtro.</p>
+}
+else
+{
+    <table>
+        <thead><tr><th>Cliente</th><th>Tipo</th><th>Título</th><th>Versión</th><th>Actualizada</th></tr></thead>
+        <tbody>
+            @foreach (var r in _rows)
+            {
+                <tr>
+                    <td><a href="@($"/clientes/{r.ClientId}")">@r.ClientName</a></td>
+                    <td>@r.TemplateName</td>
+                    <td><a href="@($"/fichas/{r.Id}")">@r.Title</a></td>
+                    <td>@r.Version</td>
+                    <td>@(r.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p class="muted">@_rows.Count registro(s).</p>
+}
+
+@code {
+    private IReadOnlyList<InfoPageService.InfoRow>? _rows;
+    private IReadOnlyList<InfoPageService.TemplateOption> _templates = [];
+    private IReadOnlyList<InfoPageService.ClientOption> _clients = [];
+    private string? _text;
+    private string _templateId = string.Empty;
+    private string _clientId = string.Empty;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _templates = await Info.TemplatesAsync();
+        _clients = await Info.ClientsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            Guid? templateId = Guid.TryParse(_templateId, out var t) ? t : null;
+            Guid? clientId = Guid.TryParse(_clientId, out var c) ? c : null;
+            _rows = await Info.SearchAsync(_text, templateId, clientId);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
+
+<style>
+    .filters { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .4rem; text-align: left; }
+    .muted { color: #4B5563; }
+    input, select { padding: .35rem; }
+</style>

@@ -25,6 +25,8 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Pre-registro por correo antes del primer acceso | ✅ |
 | Eliminar fichas pendientes; desactivar usuarios reales | ✅ |
 | Modo cerrado: solo entra quien está pre-registrado | ✅ |
+| Información del cliente por tipo (equipos, servicios, licencias, contactos, redes) | ✅ |
+| Vista global de información con filtros y gestión de tipos desde la UI | ✅ |
 | Grupos: miembros y clientes con permisos, asignación masiva | ✅ |
 | Auditoría visible con filtros | ✅ |
 | Contrato OpenAPI en `/openapi/v1.json` | ✅ |

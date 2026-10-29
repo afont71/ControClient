@@ -64,6 +64,8 @@ builder.Services.AddScoped<ControClient.Web.Pages.SearchPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.UsersPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.GroupsPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.AuditPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.InfoPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.TemplatesPageService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()

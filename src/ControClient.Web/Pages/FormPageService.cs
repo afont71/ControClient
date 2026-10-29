@@ -17,7 +17,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
 {
     public sealed record TemplateRow(Guid Id, string Key, string Name, string? Description, int Version);
     public sealed record FieldInfo(string Key, string Label, string Type, bool Required, string[] Options, string? HelpText);
-    public sealed record RecordRow(Guid Id, Guid ClientId, string TemplateName, string Title, int Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
+    public sealed record RecordRow(Guid Id, Guid ClientId, Guid TemplateId, string TemplateName, string Title, int Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
     public sealed record RecordView(Guid Id, Guid ClientId, string Title, int Version, bool CanEdit, IReadOnlyList<FieldInfo> Fields, Dictionary<string, string?> Text, Dictionary<string, bool> Bools, Dictionary<string, List<string>> Multi, Dictionary<string, string[]> Errors);
 
     public async Task<IReadOnlyList<TemplateRow>> TemplatesAsync()
@@ -32,7 +32,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
         using var scope = scopes.CreateScope();
         var forms = scope.ServiceProvider.GetRequiredService<FormService>();
         var list = await forms.ListRecordsAsync(clientId);
-        return list.Select(r => new RecordRow(r.Id, r.ClientId, r.TemplateName, r.Title, r.Version, r.CreatedAt, r.UpdatedAt)).ToList();
+        return list.Select(r => new RecordRow(r.Id, r.ClientId, r.TemplateId, r.TemplateName, r.Title, r.Version, r.CreatedAt, r.UpdatedAt)).ToList();
     }
 
     public async Task<IReadOnlyList<FieldInfo>> FieldsAsync(Guid templateId)

@@ -103,6 +103,7 @@ else
 
 @code {
     [Parameter] public Guid ClientId { get; set; }
+    [SupplyParameterFromQuery] public Guid? TemplateId { get; set; }
 
     private IReadOnlyList<FormPageService.TemplateRow> _templates = [];
     private IReadOnlyList<FormPageService.FieldInfo> _fields = [];
@@ -118,6 +119,12 @@ else
     protected override async Task OnInitializedAsync()
     {
         _templates = await Fichas.TemplatesAsync();
+
+        if (TemplateId is Guid preset && _templates.Any(t => t.Id == preset))
+        {
+            _templateId = preset.ToString();
+            await LoadFieldsAsync();
+        }
     }
 
     private async Task LoadFieldsAsync()

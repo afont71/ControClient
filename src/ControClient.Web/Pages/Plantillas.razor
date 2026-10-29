@@ -1,0 +1,150 @@
+﻿@page "/plantillas"
+@using Microsoft.AspNetCore.Authorization
+@using ControClient.Domain.Forms
+@attribute [Authorize]
+@inject TemplatesPageService Servicio
+
+<PageTitle>Tipos de ficha</PageTitle>
+
+<h1>Tipos de ficha</h1>
+
+@if (_message is not null)
+{
+    <p class="@(_isError ? "error" : "ok")">@_message</p>
+}
+
+@if (_templates is null)
+{
+    <p class="muted">Solo un administrador puede gestionar tipos de ficha.</p>
+}
+else
+{
+    <section>
+        <h2>Nuevo tipo</h2>
+        <p>
+            <label>Clave<br /><input @bind="_key" placeholder="p. ej. impresora" /></label>
+            <label>Nombre<br /><input @bind="_name" placeholder="Impresora" /></label>
+            <label>Descripción<br /><input @bind="_description" /></label>
+        </p>
+
+        <table>
+            <thead><tr><th>Clave</th><th>Etiqueta</th><th>Tipo</th><th>Obligatorio</th><th>Opciones (separadas por coma)</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var f in _fields)
+                {
+                    <tr>
+                        <td><input @bind="f.Key" /></td>
+                        <td><input @bind="f.Label" /></td>
+                        <td>
+                            <select @bind="f.Type">
+                                @foreach (var type in Enum.GetNames<FieldType>())
+                                {
+                                    <option value="@type">@type</option>
+                                }
+                            </select>
+                        </td>
+                        <td><input type="checkbox" @bind="f.Required" /></td>
+                        <td><input @bind="f.OptionsCsv" /></td>
+                        <td><button @onclick="() => RemoveField(f)">Quitar</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <p>
+            <button @onclick="AddField">+ Añadir campo</button>
+            <button @onclick="CreateAsync" disabled="@_busy">Crear tipo</button>
+        </p>
+    </section>
+
+    <section>
+        <h2>Tipos existentes</h2>
+        <table>
+            <thead><tr><th>Nombre</th><th>Clave</th><th>Versión</th><th>Campos</th><th>Activo</th></tr></thead>
+            <tbody>
+                @foreach (var t in _templates)
+                {
+                    <tr>
+                        <td>@t.Name</td>
+                        <td><code>@t.Key</code></td>
+                        <td>@t.Version</td>
+                        <td>@t.Fields</td>
+                        <td>@(t.IsActive ? "Sí" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<TemplatesPageService.TemplateRow>? _templates;
+    private readonly List<Draft> _fields = [new Draft()];
+    private string? _key;
+    private string? _name;
+    private string? _description;
+    private string? _message;
+    private bool _isError;
+    private bool _busy;
+
+    public sealed class Draft
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string Type { get; set; } = nameof(FieldType.Text);
+        public bool Required { get; set; }
+        public string? OptionsCsv { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _templates = await Servicio.ListAsync();
+
+    private void AddField() => _fields.Add(new Draft());
+
+    private void RemoveField(Draft draft) => _fields.Remove(draft);
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        try
+        {
+            var drafts = _fields
+                .Where(f => !string.IsNullOrWhiteSpace(f.Key) || !string.IsNullOrWhiteSpace(f.Label))
+                .Select(f => new TemplatesPageService.FieldDraft(f.Key, f.Label, f.Type, f.Required, f.OptionsCsv))
+                .ToList();
+
+            var (id, error) = await Servicio.CreateAsync(_key ?? string.Empty, _name ?? string.Empty, _description, drafts);
+            if (id is null)
+            {
+                SetMessage(error ?? "No se pudo crear.", true);
+                return;
+            }
+
+            SetMessage("Tipo creado. Ya aparece al añadir información a un cliente.", false);
+            _key = _name = _description = null;
+            _fields.Clear();
+            _fields.Add(new Draft());
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SetMessage(string text, bool error)
+    {
+        _message = text;
+        _isError = error;
+    }
+}
+
+<style>
+    table { border-collapse: collapse; width: 100%; margin: .5rem 0; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .35rem; text-align: left; }
+    input, select { padding: .3rem; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    .ok { color: #1B5E20; }
+</style>

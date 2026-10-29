@@ -1,4 +1,4 @@
-@page "/clientes/{Id:guid}"
+﻿@page "/clientes/{Id:guid}"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
 @using ControClient.Domain.Documents
@@ -114,32 +114,46 @@ else
     }
 
     <section>
-        <h2>Fichas</h2>
-        @if (_records.Count == 0)
+        <h2>Información del cliente</h2>
+        <p class="muted">Datos tipados por tipo: equipos, servidores, servicios, licencias, contactos, redes…</p>
+
+        @foreach (var template in _templates)
         {
-            <p>Este cliente aún no tiene fichas.</p>
-        }
-        else
-        {
-            <table>
-                <thead><tr><th>Título</th><th>Tipo</th><th>Versión</th><th>Creada</th></tr></thead>
-                <tbody>
-                    @foreach (var r in _records)
+            var items = _records.Where(r => r.TemplateId == template.Id).ToList();
+            <div class="info-group">
+                <h3>@template.Name <span class="count">(@items.Count)</span>
+                    @if (_client.CanEdit)
                     {
-                        <tr>
-                            <td><a href="@($"/fichas/{r.Id}")">@r.Title</a></td>
-                            <td>@r.TemplateName</td>
-                            <td>@r.Version</td>
-                            <td>@r.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
-                        </tr>
+                        <a class="small" href="@($"/clientes/{Id}/fichas/nueva?templateId={template.Id}")">Añadir</a>
                     }
-                </tbody>
-            </table>
+                </h3>
+
+                @if (items.Count == 0)
+                {
+                    <p class="muted">Sin registros.</p>
+                }
+                else
+                {
+                    <table>
+                        <thead><tr><th>Título</th><th>Versión</th><th>Actualizada</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in items)
+                            {
+                                <tr>
+                                    <td><a href="@($"/fichas/{r.Id}")">@r.Title</a></td>
+                                    <td>@r.Version</td>
+                                    <td>@(r.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
         }
 
-        @if (_client.CanEdit)
+        @if (_records.Count == 0)
         {
-            <p><a class="button" href="@($"/clientes/{Id}/fichas/nueva")">Añadir ficha</a></p>
+            <p class="muted">Este cliente aún no tiene información registrada.</p>
         }
     </section>
 
@@ -300,6 +314,7 @@ else
     private IReadOnlyList<ClientPageService.GrantRow> _grants = [];
     private IReadOnlyList<ClientPageService.UserRow> _users = [];
     private IReadOnlyList<FormPageService.RecordRow> _records = [];
+    private IReadOnlyList<FormPageService.TemplateRow> _templates = [];
     private IReadOnlyList<DocumentPageService.DocumentRow> _documents = [];
     private IReadOnlyList<VaultPageService.ItemRow> _vaultItems = [];
     private readonly Dictionary<Guid, string> _revealed = [];
@@ -339,6 +354,7 @@ else
             _grants = await Clientes.GrantsAsync(Id);
             _users = await Clientes.UsersAsync();
             _records = await Fichas.RecordsAsync(Id);
+            _templates = await Fichas.TemplatesAsync();
             _documents = await Documentos.ListAsync(Id);
             var vault = await Boveda.ListAsync(Id);
             _vaultItems = vault.Items;
