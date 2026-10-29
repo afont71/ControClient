@@ -100,7 +100,14 @@ else
 builder.Services.Configure<AuthenticationOptions>(options =>
 {
     options.DefaultScheme = "CookieOrBearer";
-    options.DefaultChallengeScheme = "CookieOrBearer";
+
+    // El reto (challenge) debe ir a OpenID Connect, no a la cookie: si va a la
+    // cookie, redirige a /Account/Login y el flujo de Entra nunca arranca.
+    options.DefaultChallengeScheme = useDevAuth
+        ? "CookieOrBearer"
+        : Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme;
+
+    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
 });
 
 var requireMfaClaim = builder.Configuration.GetValue("Authentication:RequireMfaClaim", true);
