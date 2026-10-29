@@ -1,0 +1,74 @@
+@page "/vencimientos"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ExpirationsPageService Servicio
+
+<PageTitle>Vencimientos</PageTitle>
+
+<h1>Vencimientos</h1>
+<p class="muted">Licencias, garantías y renovaciones que vencen en el horizonte elegido. Lo vencido aparece primero, en rojo.</p>
+
+<p>
+    <label>Horizonte<br />
+        <select @bind="_horizon" @bind:after="LoadAsync">
+            <option value="30">30 días</option>
+            <option value="90">90 días</option>
+            <option value="180">180 días</option>
+            <option value="365">1 año</option>
+        </select>
+    </label>
+    <button @onclick="LoadAsync" disabled="@_loading">Actualizar</button>
+</p>
+
+@if (_rows is null)
+{
+    <p>Sin sesión válida.</p>
+}
+else if (_rows.Count == 0)
+{
+    <p>Nada vence en ese horizonte.</p>
+}
+else
+{
+    <table>
+        <thead><tr><th>Fecha</th><th>Días</th><th>Cliente</th><th>Tipo</th><th>Registro</th><th>Campo</th></tr></thead>
+        <tbody>
+            @foreach (var r in _rows)
+            {
+                <tr class="@(r.DaysLeft < 0 ? "overdue" : r.DaysLeft <= 30 ? "soon" : "")">
+                    <td>@r.Date.ToString("dd/MM/yyyy")</td>
+                    <td>@(r.DaysLeft < 0 ? $"vencido hace {-r.DaysLeft}" : r.DaysLeft == 0 ? "hoy" : $"en {r.DaysLeft}")</td>
+                    <td>@r.ClientName</td>
+                    <td>@r.TemplateName</td>
+                    <td><a href="@($"/fichas/{r.RecordId}")">@r.RecordTitle</a></td>
+                    <td>@r.FieldLabel</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p class="muted">@_rows.Count vencimiento(s) en @_horizon días.</p>
+}
+
+@code {
+    private IReadOnlyList<ExpirationsPageService.Row>? _rows;
+    private int _horizon = 90;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try { _rows = await Servicio.ListAsync(_horizon); }
+        finally { _loading = false; }
+    }
+}
+
+<style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .4rem; text-align: left; }
+    .overdue { background: #FDECEA; color: #8B0000; }
+    .soon { background: #FFF8E1; }
+    .muted { color: #4B5563; }
+    select { padding: .35rem; }
+</style>

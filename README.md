@@ -27,12 +27,13 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Modo cerrado: solo entra quien está pre-registrado | ✅ |
 | Información del cliente por tipo (equipos, servicios, licencias, contactos, redes) | ✅ |
 | Vista global de información con filtros y gestión de tipos desde la UI | ✅ |
+| Vencimientos: licencias, garantías y renovaciones por horizonte | ✅ |
 | Grupos: miembros y clientes con permisos, asignación masiva | ✅ |
 | Auditoría visible con filtros | ✅ |
 | Contrato OpenAPI en `/openapi/v1.json` | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
 | Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda, búsqueda y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 60 |
+| Pruebas automatizadas | ✅ 63 |
 | CI (build + test) | ✅ |
 
 Conectado el tenant real (login + MFA por política). Pendiente: Android (6) y migración (7).

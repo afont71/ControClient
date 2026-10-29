@@ -66,6 +66,8 @@ builder.Services.AddScoped<ControClient.Web.Pages.GroupsPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.AuditPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.InfoPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.TemplatesPageService>();
+ builder.Services.AddScoped<ControClient.Infrastructure.Expirations.ExpirationsService>();
+builder.Services.AddScoped<ControClient.Web.Pages.ExpirationsPageService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
@@ -223,6 +225,7 @@ app.MapDocumentEndpoints();
  app.MapVaultEndpoints();
 app.MapSearchEndpoints();
 app.MapGroupEndpoints();
+app.MapExpirationEndpoints();
 
 // El contrato describe toda la superficie de la API: no se publica en abierto.
 // En desarrollo queda accesible con sesión de administrador.
