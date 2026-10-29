@@ -1,4 +1,4 @@
-﻿@page "/fichas/{Id:guid}"
+@page "/fichas/{Id:guid}"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject FormPageService Fichas
@@ -151,7 +151,13 @@ else
 
         foreach (var field in _view.Fields)
         {
-            if (_view.Text.TryGetValue(field.Key, out var text)) _text[field.Key] = text;
+            // Inicializar TODAS las claves: los campos opcionales sin valor no
+            // están en los diccionarios y el @bind lanzaba KeyNotFoundException,
+            // lo que rompía el circuito al pulsar «Editar ficha».
+            _text[field.Key] = string.Empty;
+            _bools[field.Key] = false;
+
+            if (_view.Text.TryGetValue(field.Key, out var text)) _text[field.Key] = text ?? string.Empty;
             if (_view.Bools.TryGetValue(field.Key, out var flag)) _bools[field.Key] = flag;
             if (_view.Multi.TryGetValue(field.Key, out var list)) _multi[field.Key] = [.. list];
         }
