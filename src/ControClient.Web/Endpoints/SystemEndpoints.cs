@@ -27,12 +27,19 @@ public static class SystemEndpoints
             }, statusCode: databaseOk ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable);
         }).AllowAnonymous();
 
-        // Información de sistema: exige sesión con MFA.
-        app.MapGet("/api/v1/system/info", (ClaimsPrincipal principal, IConfiguration config) =>
+        // Información de sistema. El rol que se muestra es el de la BASE DE DATOS,
+        // que es el que aplica la autorización; el token de Entra no trae roles.
+        app.MapGet("/api/v1/system/info", async (
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            IConfiguration config,
+            CancellationToken ct) =>
         {
-            var user = CurrentUser.FromPrincipal(principal);
+            var user = await UserResolver.ResolveAsync(principal, provisioner, ct);
             if (user is null)
                 return Results.Unauthorized();
+
+            var claimUser = CurrentUser.FromPrincipal(principal);
 
             return Results.Ok(new
             {
@@ -41,7 +48,15 @@ public static class SystemEndpoints
                 environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
                 vault = "sealed", // Etapa 4: estado real de la bóveda (SEC-11…SEC-14).
                 specification = "v1.0.0",
-                authentication = config["Authentication:Mode"] ?? "Entra",                user = new { user.ObjectId, user.Name, Role = user.Role.ToString(), user.MfaSatisfied }
+                authentication = config["Authentication:Mode"] ?? "Entra",
+                user = new
+                {
+                    ObjectId = user.EntraObjectId,
+                    Name = user.DisplayName,
+                    Role = user.Role.ToString(),
+                    MfaSatisfied = claimUser?.MfaSatisfied ?? false,
+                    IsActive = user.IsActive
+                }
             });
         }).RequireAuthorization();
 
