@@ -1,9 +1,11 @@
 @page "/clientes/{Id:guid}"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
+@using ControClient.Domain.Documents
 @attribute [Authorize]
 @inject ClientPageService Clientes
 @inject FormPageService Fichas
+@inject DocumentPageService Documentos
 
 <PageTitle>Ficha de cliente</PageTitle>
 
@@ -139,6 +141,79 @@ else
         }
     </section>
 
+    <section>
+        <h2>Documentación</h2>
+
+        @if (_documents.Count == 0)
+        {
+            <p>Sin documentos.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Documento</th><th>Clasificación</th><th>Versión</th><th>Tamaño</th><th>Actualizado</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var d in _documents)
+                    {
+                        <tr>
+                            <td>@d.Name</td>
+                            <td>@d.Classification</td>
+                            <td>@d.CurrentVersion</td>
+                            <td>@FormatSize(d.SizeBytes)</td>
+                            <td>@d.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                            <td>
+                                <a href="@($"/api/v1/documents/{d.Id}/content")">Descargar</a>
+                                @if (_client.CanEdit)
+                                {
+                                    <button @onclick="() => StartVersion(d.Id, d.Name)">Nueva versión</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (_client.CanEdit)
+        {
+            <h3>@(_targetDocumentId is null ? "Subir documento" : $"Nueva versión de {_targetName}")</h3>
+
+            @if (_uploadMessage is not null)
+            {
+                <p class="@(_uploadIsError ? "error" : "ok")">@_uploadMessage</p>
+            }
+
+            @if (_targetDocumentId is null)
+            {
+                <p><label>Nombre del documento<br /><input @bind="_docName" placeholder="Ej. Contrato mantenimiento" /></label></p>
+                <p>
+                    <label>Clasificación<br />
+                        <select @bind="_classification">
+                            @foreach (var value in Enum.GetNames<DocumentClassification>())
+                            {
+                                <option value="@value">@value</option>
+                            }
+                        </select>
+                    </label>
+                </p>
+            }
+
+            <p><InputFile OnChange="OnFileSelected" /></p>
+            @if (_file is not null)
+            {
+                <p class="muted">@_file.Name · @FormatSize(_file.Size)</p>
+            }
+
+            <button @onclick="UploadAsync" disabled="@(_file is null || _uploading)">
+                @(_uploading ? "Subiendo…" : "Subir")
+            </button>
+            @if (_targetDocumentId is not null)
+            {
+                <button @onclick="CancelVersion">Cancelar</button>
+            }
+        }
+    </section>
+
     <p><a href="/clientes">Volver a clientes</a></p>
 }
 
@@ -149,6 +224,15 @@ else
     private IReadOnlyList<ClientPageService.GrantRow> _grants = [];
     private IReadOnlyList<ClientPageService.UserRow> _users = [];
     private IReadOnlyList<FormPageService.RecordRow> _records = [];
+    private IReadOnlyList<DocumentPageService.DocumentRow> _documents = [];
+    private IBrowserFile? _file;
+    private string? _docName;
+    private DocumentClassification _classification = DocumentClassification.Internal;
+    private Guid? _targetDocumentId;
+    private string? _targetName;
+    private string? _uploadMessage;
+    private bool _uploadIsError;
+    private bool _uploading;
     private readonly Form _form = new();
     private readonly GrantForm _grantForm = new();
     private bool _loading = true;
@@ -167,6 +251,7 @@ else
             _grants = await Clientes.GrantsAsync(Id);
             _users = await Clientes.UsersAsync();
             _records = await Fichas.RecordsAsync(Id);
+            _documents = await Documentos.ListAsync(Id);
         }
         _loading = false;
     }
@@ -219,6 +304,83 @@ else
         _message = text;
         _isError = error;
     }
+
+    private void OnFileSelected(InputFileChangeEventArgs args)
+    {
+        _file = args.File;
+        _uploadMessage = null;
+    }
+
+    private void StartVersion(Guid documentId, string name)
+    {
+        _targetDocumentId = documentId;
+        _targetName = name;
+        _docName = null;
+        _file = null;
+        _uploadMessage = null;
+    }
+
+    private void CancelVersion()
+    {
+        _targetDocumentId = null;
+        _targetName = null;
+        _file = null;
+        _uploadMessage = null;
+    }
+
+    private async Task UploadAsync()
+    {
+        if (_file is null)
+        {
+            SetUpload("Selecciona un fichero.", true);
+            return;
+        }
+
+        _uploading = true;
+        try
+        {
+            const long max = 50L * 1024 * 1024;
+            await using var stream = _file.OpenReadStream(max);
+
+            var (ok, error) = _targetDocumentId is Guid target
+                ? await Documentos.NewVersionAsync(target, _file.Name, stream)
+                : await Documentos.UploadAsync(Id, _docName, _classification, _file.Name, stream);
+
+            if (!ok)
+            {
+                SetUpload(error ?? "No se pudo subir el documento.", true);
+                return;
+            }
+
+            SetUpload(_targetDocumentId is null ? "Documento subido." : "Nueva versión añadida.", false);
+            _file = null;
+            _docName = null;
+            _targetDocumentId = null;
+            _targetName = null;
+            _documents = await Documentos.ListAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            SetUpload($"Error al subir: {ex.Message}", true);
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private void SetUpload(string text, bool error)
+    {
+        _uploadMessage = text;
+        _uploadIsError = error;
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024):0.0} MB",
+        >= 1024 => $"{bytes / 1024.0:0} KB",
+        _ => $"{bytes} B"
+    };
 
     public sealed class Form
     {

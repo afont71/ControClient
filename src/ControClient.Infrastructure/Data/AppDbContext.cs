@@ -1,5 +1,6 @@
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
+using ControClient.Domain.Documents;
 using ControClient.Domain.Forms;
 using ControClient.Domain.Users;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ClientGrant> Grants => Set<ClientGrant>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
+    public DbSet<Document> Documents => Set<Document>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -137,6 +139,45 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_record_instances_client");
             e.HasOne<FormTemplate>().WithMany().HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_record_instances_template");
+        });
+
+        modelBuilder.Entity<Document>(e =>
+        {
+            e.ToTable("documents");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.ClientId).HasColumnName("client_id");
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(300).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            e.Property(x => x.Classification).HasColumnName("classification").HasConversion<int>();
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+            e.HasIndex(x => x.ClientId).HasDatabaseName("ix_documents_client");
+            e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_documents_client");
+
+            e.HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.DocumentId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_document_versions_document");
+        });
+
+        modelBuilder.Entity<DocumentVersion>(e =>
+        {
+            e.ToTable("document_versions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.DocumentId).HasColumnName("document_id");
+            e.Property(x => x.Version).HasColumnName("version");
+            e.Property(x => x.FileName).HasColumnName("file_name").HasMaxLength(300).IsRequired();
+            e.Property(x => x.ContentType).HasColumnName("content_type").HasMaxLength(200).IsRequired();
+            e.Property(x => x.SizeBytes).HasColumnName("size_bytes");
+            e.Property(x => x.Sha256).HasColumnName("sha256").HasMaxLength(64).IsRequired();
+            e.Property(x => x.StoragePath).HasColumnName("storage_path").HasMaxLength(300).IsRequired();
+            e.Property(x => x.UploadedAt).HasColumnName("uploaded_at");
+            e.Property(x => x.UploadedBy).HasColumnName("uploaded_by").HasMaxLength(200).IsRequired();
+            e.Property(x => x.ScanStatus).HasColumnName("scan_status").HasConversion<int>();
+            e.HasIndex(x => new { x.DocumentId, x.Version }).IsUnique().HasDatabaseName("ux_document_versions_document_version");
+            e.HasIndex(x => x.Sha256).HasDatabaseName("ix_document_versions_sha256");
         });
     }
 }

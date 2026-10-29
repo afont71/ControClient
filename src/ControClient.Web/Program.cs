@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ControClient.Infrastructure;
 using ControClient.Web.Components;
 using ControClient.Web.Endpoints;
@@ -24,9 +24,19 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
+
+// La raíz del almacén documental se resuelve aquí para admitir rutas relativas.
+var documentsRoot = builder.Configuration["Storage:DocumentsRoot"];
+if (string.IsNullOrWhiteSpace(documentsRoot))
+    documentsRoot = Path.Combine(builder.Environment.ContentRootPath, "storage", "documents");
+else if (!Path.IsPathRooted(documentsRoot))
+    documentsRoot = Path.Combine(builder.Environment.ContentRootPath, documentsRoot);
+builder.Configuration["Storage:DocumentsRoot"] = documentsRoot;
+
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ControClient.Web.Pages.ClientPageService>();
- builder.Services.AddScoped<ControClient.Web.Pages.FormPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.FormPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.DocumentPageService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
@@ -99,6 +109,7 @@ app.MapStaticAssets();
 app.MapSystemEndpoints();
 app.MapClientEndpoints();
 app.MapFormEndpoints();
+app.MapDocumentEndpoints();
 
 // Plantillas iniciales (idempotente). En producción puede desactivarse por configuración.
 if (app.Configuration.GetValue("Seeding:DefaultTemplates", true))

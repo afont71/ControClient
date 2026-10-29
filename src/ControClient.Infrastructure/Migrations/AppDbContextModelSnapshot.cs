@@ -179,6 +179,121 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("client_grants", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Documents.Document", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Classification")
+                        .HasColumnType("integer")
+                        .HasColumnName("classification");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId")
+                        .HasDatabaseName("ix_documents_client");
+
+                    b.ToTable("documents", (string)null);
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Documents.DocumentVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("ScanStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("scan_status");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("storage_path");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("uploaded_by");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Sha256")
+                        .HasDatabaseName("ix_document_versions_sha256");
+
+                    b.HasIndex("DocumentId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ux_document_versions_document_version");
+
+                    b.ToTable("document_versions", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Forms.FormTemplate", b =>
                 {
                     b.Property<Guid>("Id")
@@ -358,6 +473,26 @@ namespace ControClient.Infrastructure.Migrations
                         .HasConstraintName("fk_client_grants_user");
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Documents.Document", b =>
+                {
+                    b.HasOne("ControClient.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_documents_client");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Documents.DocumentVersion", b =>
+                {
+                    b.HasOne("ControClient.Domain.Documents.Document", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_document_versions_document");
+                });
+
             modelBuilder.Entity("ControClient.Domain.Forms.FormTemplate", b =>
                 {
                     b.OwnsMany("ControClient.Domain.Forms.FieldDefinition", "Fields", b1 =>
@@ -432,6 +567,11 @@ namespace ControClient.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_record_instances_template");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Documents.Document", b =>
+                {
+                    b.Navigation("Versions");
                 });
 #pragma warning restore 612, 618
         }

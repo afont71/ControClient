@@ -36,6 +36,15 @@ public static class DependencyInjection
         services.AddScoped<IClientAccessService, ClientAccessService>();
         services.AddScoped<IUserProvisioner, UserProvisioner>();
         services.AddScoped<ControClient.Infrastructure.Forms.FormService>();
+        services.AddSingleton(sp =>
+        {
+            var root = configuration["Storage:DocumentsRoot"];
+            if (string.IsNullOrWhiteSpace(root))
+                root = Path.Combine(AppContext.BaseDirectory, "storage", "documents");
+
+            return new ControClient.Infrastructure.Storage.DocumentStorage(root);
+        });
+        services.AddScoped<ControClient.Infrastructure.Documents.DocumentService>();
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
         return services;

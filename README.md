@@ -15,12 +15,14 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Pantallas de clientes (lista, alta, ficha, permisos) | ✅ |
 | Plantillas versionadas y fichas dinámicas con validación | ✅ |
 | Pantallas de fichas (alta, detalle, edición con versión) | ✅ |
+| Documentos con hash SHA-256, versiones y descarga auditada | ✅ |
+| Subida desde la ficha del cliente con clasificación | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
-| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 33 |
+| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos y auditoría | ✅ |
+| Pruebas automatizadas | ✅ 37 |
 | CI (build + test) | ✅ |
 
-Pendiente: documentación (3), bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
+Pendiente: bóveda (4), búsqueda y OpenAPI (5), Android (6), migración (7).
 
 ## Estructura
 
@@ -68,9 +70,22 @@ Endpoints útiles:
 | `POST /api/v1/clients/{id}/records` | editar el cliente | alta de ficha validada |
 | `GET /api/v1/records/{id}` | ver su cliente | ficha + esquema de la plantilla |
 | `PATCH /api/v1/records/{id}` | editar su cliente | actualización con versión (**409** si cambió) |
+| `GET /api/v1/clients/{id}/documents` | ver el cliente | documentos y versión actual |
+| `POST /api/v1/clients/{id}/documents` | editar el cliente | subida `multipart/form-data` (`file`, `name`, `classification`) |
+| `GET /api/v1/documents/{id}` | ver su cliente | documento con todas las versiones |
+| `POST /api/v1/documents/{id}/versions` | editar su cliente | nueva versión (`file`) |
+| `GET /api/v1/documents/{id}/content?version=` | ver su cliente | descarga desde el almacén, auditada |
 | `GET /api/v1/audit/events` | administrador, auditor o custodio | últimos 50 eventos |
 
 Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar secretos. Se combinan sumando: `3` = ver y editar.
+
+### Documentos
+
+- El contenido se guarda en disco, fuera de la base: `Storage:DocumentsRoot` (por defecto `storage/documents` junto a la aplicación).
+- Ruta derivada del SHA-256; contenido idéntico no se duplica.
+- Límite por defecto 50 MB (`Documents:MaxBytes`) y bloqueo de ejecutables (`.exe`, `.dll`, `.ps1`, `.msi`, `.iso`…).
+- `scanStatus` empieza como `NotScanned`: **no hay antivirus conectado** en esta etapa; no lo interpretes como limpio.
+- Cada descarga queda auditada con actor, cliente, documento y versión.
 
 Las plantillas iniciales (`servidor`, `vpn`, `correo`) se siembran al arrancar si no hay ninguna y pueden desactivarse con `Seeding:DefaultTemplates=false`.
 
