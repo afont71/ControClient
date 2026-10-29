@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ControClient.Infrastructure;
 using ControClient.Web.Components;
 using ControClient.Web.Endpoints;
@@ -47,6 +47,21 @@ builder.Services.AddScoped<ControClient.Web.Pages.SearchPageService>();
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
                  && authenticationMode.Equals("Development", StringComparison.OrdinalIgnoreCase);
+
+// Fail-fast: en producción con Entra no se arranca con valores de plantilla.
+if (!builder.Environment.IsDevelopment() && !useDevAuth)
+{
+    static bool IsPlaceholder(string? value) =>
+        string.IsNullOrWhiteSpace(value) || value.Equals("PENDIENTE", StringComparison.OrdinalIgnoreCase);
+
+    if (IsPlaceholder(builder.Configuration["AzureAd:TenantId"])
+        || IsPlaceholder(builder.Configuration["AzureAd:ClientId"]))
+    {
+        throw new InvalidOperationException(
+            "Configuración incompleta: define AzureAd:TenantId y AzureAd:ClientId (user-secrets o variables de entorno) " +
+            "antes de arrancar en producción. Ver docs/entra-id-setup.md.");
+    }
+}
 
 var authBuilder = builder.Services.AddAuthentication();
 
