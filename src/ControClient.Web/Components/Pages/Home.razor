@@ -23,19 +23,26 @@
 <div class="cards">
     <section class="card">
         <h2>Clientes</h2>
-        <p>Alta, consulta y permisos por cliente. Disponible a partir de la etapa 1.</p>
-        <a href="/api/v1/clients">Ver API de clientes</a>
+        <p>Alta, consulta, permisos por cliente, fichas técnicas y documentación.</p>
+        <a href="/clientes">Ir a clientes</a>
     </section>
 
     <section class="card">
         <h2>Bóveda</h2>
-        <p><span class="badge">Sellada</span> El desellado por administrador llega en la etapa 4.</p>
+        <p><span class="badge">Sellada</span> Desellado por administrador con MFA; el revelado requiere permiso explícito.</p>
+        <a href="/boveda">Estado de la bóveda</a>
+    </section>
+
+    <section class="card">
+        <h2>Buscar</h2>
+        <p>Búsqueda global en clientes, fichas, documentos y credenciales (sin secretos).</p>
+        <a href="/buscar">Buscar</a>
     </section>
 
     <section class="card">
         <h2>Estado del servicio</h2>
         <p>Comprobación técnica: <a href="/health">/health</a></p>
-        <p>Modo de autenticación: <code>@Configuration["Authentication:Mode"]</code></p>
+        <p>Autenticación: <code>@Configuration["Authentication:Mode"]</code></p>
     </section>
 </div>
 

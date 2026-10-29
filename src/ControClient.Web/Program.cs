@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
 using ControClient.Infrastructure;
@@ -185,6 +185,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Orden explícito: autenticar, dar de alta al usuario y autorizar.
+app.UseAuthentication();
+app.UseMiddleware<ControClient.Web.Security.UserProvisioningMiddleware>();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
