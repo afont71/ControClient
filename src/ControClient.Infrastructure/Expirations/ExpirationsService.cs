@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using ControClient.Domain.Forms;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +19,8 @@ public sealed class ExpirationsService(AppDbContext db)
         string RecordTitle,
         string FieldLabel,
         DateOnly Date,
-        int DaysLeft);
+        int DaysLeft,
+        int WarningDays);
 
     public async Task<IReadOnlyList<Expiration>> GetAsync(
         IReadOnlyCollection<Guid>? visibleClientIds,
@@ -63,6 +64,8 @@ public sealed class ExpirationsService(AppDbContext db)
 
             using (doc)
             {
+                var warningDays = ReadWarningDays(doc.RootElement);
+
                 foreach (var field in fields)
                 {
                     if (!doc.RootElement.TryGetProperty(field.Key, out var property)
@@ -83,11 +86,31 @@ public sealed class ExpirationsService(AppDbContext db)
                         record.Title,
                         field.Label,
                         date,
-                        date.DayNumber - today.DayNumber));
+                        date.DayNumber - today.DayNumber,
+                        warningDays));
                 }
             }
         }
 
         return results.OrderBy(r => r.Date).ThenBy(r => r.ClientName).ToList();
+    }
+
+    /// <summary>Aviso configurado en la ficha («30 días», «6 meses»…). Por defecto 30 días.</summary>
+    private static int ReadWarningDays(JsonElement root)
+    {
+        if (!root.TryGetProperty("aviso", out var value) || value.ValueKind != JsonValueKind.String)
+            return 30;
+
+        return value.GetString()?.Trim().ToLowerInvariant() switch
+        {
+            "7 días" => 7,
+            "15 días" => 15,
+            "30 días" => 30,
+            "60 días" => 60,
+            "90 días" => 90,
+            "6 meses" => 180,
+            "1 año" => 365,
+            _ => 30
+        };
     }
 }

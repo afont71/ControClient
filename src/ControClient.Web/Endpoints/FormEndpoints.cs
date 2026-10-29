@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
@@ -246,6 +246,43 @@ public static class FormEndpoints
                 reason: $"ficha={record.Id} version={record.Version}"), ct);
 
             return Results.Ok(new { record.Id, record.Title, record.Version, record.UpdatedAt });
+        });
+
+        group.MapDelete("/records/{id:guid}", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            IClientAccessService access,
+            FormService forms,
+            IAuditWriter audit,
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
+        {
+            var user = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (user is null)
+                return Results.Unauthorized();
+
+            var record = await forms.GetRecordAsync(id, ct);
+            if (record is null)
+                return Results.NotFound();
+
+            if (!await access.CanEditAsync(user, record.ClientId, ct))
+                return Results.Forbid();
+
+            var title = record.Title;
+            if (!await forms.DeleteRecordAsync(id, ct))
+                return Results.NotFound();
+
+            await audit.WriteAsync(new AuditEvent(
+                entity: "records",
+                action: "records.delete",
+                actorName: user.DisplayName,
+                actorObjectId: user.EntraObjectId,
+                correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
+                clientId: record.ClientId,
+                reason: $"ficha={title}"), ct);
+
+            return Results.NoContent();
         });
 
         return app;

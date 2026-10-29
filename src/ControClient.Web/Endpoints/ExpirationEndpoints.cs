@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ControClient.Domain.Abstractions;
 using ControClient.Infrastructure.Expirations;
 using ControClient.Web.Security;
@@ -34,7 +34,8 @@ public static class ExpirationEndpoints
                 r.FieldLabel,
                 Date = r.Date.ToString("yyyy-MM-dd"),
                 r.DaysLeft,
-                status = r.DaysLeft < 0 ? "vencido" : r.DaysLeft <= 30 ? "proximo" : "futuro"
+                r.WarningDays,
+                status = r.DaysLeft < 0 ? "vencido" : r.DaysLeft <= r.WarningDays ? "avisar" : "futuro"
             }));
         }).RequireAuthorization().WithTags("Vencimientos");
 

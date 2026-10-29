@@ -1,4 +1,4 @@
-@page "/vencimientos"
+﻿@page "/vencimientos"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject ExpirationsPageService Servicio
@@ -15,10 +15,10 @@
 </p>
 
 <section>
-    <h2>Añadir vencimiento</h2>
+    <h2>Añadir licencia</h2>
     <p class="muted">
-        Se guarda como una ficha del cliente con su fecha. En cuanto tenga fecha,
-        aparece aquí solo, sin duplicar datos.
+        Las licencias y servicios son los que tienen fecha de finalización. Al guardarlos
+        aparecen aquí solos, con el aviso que hayas configurado en la ficha.
     </p>
     <div class="toolbar">
         <label>Cliente
@@ -30,12 +30,12 @@
                 }
             </select>
         </label>
-        <button class="primary" @onclick="AddAsync" disabled="@(!CanAdd)">+ Añadir vencimiento</button>
+        <button class="primary" @onclick="AddAsync" disabled="@(!CanAdd)">+ Añadir licencia</button>
     </div>
     @if (_templateId is null)
     {
         <p class="muted">
-            No existe el tipo «Vencimiento». Un administrador puede crearlo en
+            No existe el tipo «Licencia». Un administrador puede crearlo en
             <a href="/plantillas">Tipos</a> con un campo de fecha.
         </p>
     }
@@ -64,7 +64,7 @@ else if (_rows.Count == 0)
 else
 {
     <table>
-        <thead><tr><th>Fecha</th><th>Días</th><th>Cliente</th><th>Tipo</th><th>Registro</th><th>Campo</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Días</th><th>Cliente</th><th>Tipo</th><th>Registro</th><th>Aviso</th></tr></thead>
         <tbody>
             @foreach (var r in _rows)
             {
@@ -74,7 +74,20 @@ else
                     <td>@r.ClientName</td>
                     <td>@r.TemplateName</td>
                     <td><a href="@($"/fichas/{r.RecordId}")">@r.RecordTitle</a></td>
-                    <td>@r.FieldLabel</td>
+                    <td>
+                        @if (r.DaysLeft < 0)
+                        {
+                            <span class="badge danger">vencido</span>
+                        }
+                        else if (r.DaysLeft <= r.WarningDays)
+                        {
+                            <span class="badge warn">avisar (@r.WarningDays d)</span>
+                        }
+                        else
+                        {
+                            <span class="muted">@r.WarningDays d</span>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>
@@ -99,7 +112,7 @@ else
 
         var templates = await Fichas.TemplatesAsync();
         _templateId = templates.FirstOrDefault(t =>
-            string.Equals(t.Key, "vencimiento", StringComparison.OrdinalIgnoreCase))?.Id;
+            string.Equals(t.Key, "licencia", StringComparison.OrdinalIgnoreCase))?.Id;
 
         await LoadAsync();
     }

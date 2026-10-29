@@ -55,6 +55,33 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             .ToList();
     }
 
+    public async Task<(bool Ok, string? Error)> DeleteAsync(Guid recordId)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (user, access, forms) = await ResolveAsync(sp);
+        if (user is null)
+            return (false, "Sin sesión.");
+
+        var record = await forms.GetRecordAsync(recordId);
+        if (record is null)
+            return (false, "La ficha no existe.");
+
+        if (!await access.CanEditAsync(user, record.ClientId))
+            return (false, "No tienes permiso para modificar este cliente.");
+
+        if (!await forms.DeleteRecordAsync(recordId))
+            return (false, "No se pudo eliminar.");
+
+        var audit = sp.GetRequiredService<ControClient.Domain.Abstractions.IAuditWriter>();
+        await audit.WriteAsync(new ControClient.Domain.Auditing.AuditEvent(
+            entity: "records", action: "records.delete", actorName: user.DisplayName,
+            actorObjectId: user.EntraObjectId, correlationId: Guid.NewGuid().ToString("N"),
+            clientId: record.ClientId, reason: $"ficha={record.Title}"));
+
+        return (true, null);
+    }
+
     public async Task<RecordView?> GetAsync(Guid recordId)
     {
         using var scope = scopes.CreateScope();

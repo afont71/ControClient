@@ -71,7 +71,21 @@ else
                             <tr>
                                 <td>@r.Title</td>
                                 <td>@(r.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? r.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy"))</td>
-                                <td><a href="@($"/fichas/{r.Id}")">@(_client.CanEdit ? "Ver / editar" : "Ver")</a></td>
+                                                                <td>
+                                    <a href="@($"/fichas/{r.Id}")">@(_client.CanEdit ? "Ver / editar" : "Ver")</a>
+                                    @if (_client.CanEdit)
+                                    {
+                                        @if (_confirmDelete == r.Id)
+                                        {
+                                            <button class="danger small" @onclick="() => DeleteAsync(r.Id)">¿Eliminar?</button>
+                                            <button class="small" @onclick="() => _confirmDelete = null">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="danger small" @onclick="() => _confirmDelete = r.Id">Eliminar</button>
+                                        }
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -91,6 +105,16 @@ else
     private string _newTemplateId = string.Empty;
     private string? _message;
     private bool _isError;
+    private Guid? _confirmDelete;
+
+    private async Task DeleteAsync(Guid recordId)
+    {
+        var (ok, error) = await Fichas.DeleteAsync(recordId);
+        _message = ok ? "Ficha eliminada." : error ?? "No se pudo eliminar.";
+        _isError = !ok;
+        _confirmDelete = null;
+        await LoadAsync();
+    }
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 

@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Expirations;
 using ControClient.Web.Security;
@@ -12,7 +12,7 @@ public sealed class ExpirationsPageService(
     AuthenticationStateProvider auth,
     ExpirationsService expirations)
 {
-    public sealed record Row(Guid RecordId, string ClientName, string TemplateName, string RecordTitle, string FieldLabel, DateOnly Date, int DaysLeft);
+    public sealed record Row(Guid RecordId, string ClientName, string TemplateName, string RecordTitle, string FieldLabel, DateOnly Date, int DaysLeft, int WarningDays);
 
     public async Task<IReadOnlyList<Row>?> ListAsync(int horizonDays)
     {
@@ -36,6 +36,6 @@ public sealed class ExpirationsPageService(
 
         return items.Select(i => new Row(
             i.RecordId, i.ClientName, i.TemplateName, i.RecordTitle,
-            i.FieldLabel, i.Date, i.DaysLeft)).ToList();
+            i.FieldLabel, i.Date, i.DaysLeft, i.WarningDays)).ToList();
     }
 }

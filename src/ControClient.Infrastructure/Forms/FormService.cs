@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using ControClient.Domain.Forms;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -119,6 +119,17 @@ public sealed class FormService(AppDbContext db)
                 x.r.Id, x.r.ClientId, x.r.TemplateId, x.Name, x.r.TemplateVersion,
                 x.r.Title, x.r.Version, x.r.CreatedAt, x.r.UpdatedAt, x.r.CreatedBy))
             .ToListAsync(ct);
+    }
+
+    public async Task<bool> DeleteRecordAsync(Guid id, CancellationToken ct = default)
+    {
+        var record = await db.Records.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (record is null)
+            return false;
+
+        db.Records.Remove(record);
+        await db.SaveChangesAsync(ct);
+        return true;
     }
 
     public Task<RecordInstance?> GetRecordAsync(Guid id, CancellationToken ct = default) =>

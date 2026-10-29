@@ -102,8 +102,10 @@ public static class DefaultTemplateSeeder
                     options: Options("Suscripción", "Perpetua", "OEM", "Otro")),
                 new FieldDefinition("cantidad", "Cantidad", FieldType.Number, order: 3),
                 new FieldDefinition("proveedor", "Proveedor", FieldType.Text, order: 4),
-                new FieldDefinition("renovacion", "Renovación", FieldType.Date, order: 5),
-                new FieldDefinition("notas", "Notas (sin claves ni contraseñas)", FieldType.LongText, order: 6)
+                new FieldDefinition("renovacion", "Fecha de finalización", FieldType.Date, order: 5),
+                new FieldDefinition("aviso", "Avisar antes de", FieldType.Select, order: 6,
+                    options: Options("7 días", "15 días", "30 días", "60 días", "90 días", "6 meses", "1 año")),
+                new FieldDefinition("notas", "Notas (sin claves ni contraseñas)", FieldType.LongText, order: 7)
             ]));
         }
 
@@ -131,17 +133,23 @@ public static class DefaultTemplateSeeder
             ]));
         }
 
-        if (!keys.Contains("vencimiento"))
+        // Migración de la plantilla de licencia: si la última versión no tiene el
+        // aviso previo, se crea una versión nueva conservando los campos actuales.
+        var latestLicense = await db.FormTemplates
+            .Where(t => t.Key == "licencia")
+            .OrderByDescending(t => t.Version)
+            .FirstOrDefaultAsync(ct);
+
+        if (latestLicense is not null && latestLicense.Fields.All(f => f.Key != "aviso"))
         {
-            Add(new FormTemplate("vencimiento", "Vencimiento", "Fecha a vigilar: contrato, dominio, certificado, licencia…",
-            [
-                new FieldDefinition("concepto", "Concepto", FieldType.Text, required: true, order: 1),
-                new FieldDefinition("tipo", "Tipo", FieldType.Select, required: true, order: 2,
-                    options: Options("Contrato", "Dominio", "Certificado SSL", "Licencia", "Seguro", "Otro")),
-                new FieldDefinition("fecha", "Fecha de vencimiento", FieldType.Date, required: true, order: 3),
-                new FieldDefinition("responsable", "Responsable", FieldType.Email, order: 4),
-                new FieldDefinition("notas", "Notas", FieldType.LongText, order: 5)
-            ]));
+            var fields = latestLicense.Fields.OrderBy(f => f.Order).Select(f =>
+                new FieldDefinition(f.Key, f.Label, f.Type, f.IsRequired, f.Order, f.OptionsJson, f.HelpText)).ToList();
+
+            fields.Insert(fields.Count - 1, new FieldDefinition("aviso", "Avisar antes de", FieldType.Select,
+                required: false, order: fields.Count, options: Options("7 días", "15 días", "30 días", "60 días", "90 días", "6 meses", "1 año")));
+
+            db.FormTemplates.Add(new FormTemplate("licencia", latestLicense.Name, latestLicense.Description,
+                fields, latestLicense.Version + 1));
         }
 
         if (db.ChangeTracker.HasChanges())
