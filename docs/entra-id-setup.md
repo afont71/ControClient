@@ -106,8 +106,27 @@ certificado de CA pública con validación DNS-01.
 
 | Síntoma | Causa |
 | --- | --- |
-| `AADSTS50011` | URI de redirección no registrada exactamente (incluye esquema y puerto) |
-| `AADSTS700054` | Falta consentimiento del ámbito de la API |
+| `AADSTS50011` | URI de redirección no registrada exactamente |
+| `AADSTS700054` | La app pide `id_token`: debe pedir `code` (la aplicación ya lo fuerza) |
+| `message.State is null` | Cookie de correlación perdida: usa HTTPS o `response_mode=query` (ya configurado en Development) |
 | Entra como `ReadOnly` | Falta `Authentication:BootstrapAdminObjectId` o el `oid` no coincide |
 | Bucle de login | Cookies bloqueadas por `SameSite`/HTTPS: usa HTTPS también en pruebas |
-| Arranque falla con «Configuración incompleta» | El servidor no arranca a propósito si `TenantId` o `ClientId` siguen en `PENDIENTE` |
+| Arranque falla con «Configuración incompleta» | El servidor no arranca a propósito si faltan `TenantId`, `ClientId` o la credencial |
+
+## Identificadores y MFA: comprobación real
+
+En **Development** existe `GET /api/v1/system/claims`, que devuelve los tipos de claim
+con valores enmascarados. Sirve para diagnosticar sin exponer datos.
+
+Lecciones verificadas contra el tenant real:
+
+1. **El identificador estable es `objectidentifier` (GUID de 36).**
+   `nameidentifier` es el claim `sub` (43 caracteres, identificador por aplicación) y
+   **no** debe usarse como clave: la aplicación ya prioriza el `oid`.
+2. **`BootstrapAdminObjectId` es el GUID del usuario**, no el `sub` ni el id de la
+   aplicación. Solo se aplica al crear la fila; si el usuario ya existe como
+   `ReadOnly`, hay que cambiar el rol en la base de datos o borrar la fila.
+3. **Si el tenant no emite `amr` ni `acrs`**, la MFA no se puede comprobar en el
+   token: la garantía es el acceso condicional. En ese caso
+   `Authentication:RequireMfaClaim` debe ser `false`; en producción, valora añadir
+   claims opcionales o aceptar la política como control único y documentarlo.
