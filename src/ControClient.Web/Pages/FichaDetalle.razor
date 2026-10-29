@@ -81,7 +81,7 @@ else
                             }
                             break;
                         case "LongText":
-                            <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
+                            <textarea class="long-text" @bind="_text[field.Key]" rows="10"></textarea>
                             break;
                         case "Number":
                             <input type="number" step="any" @bind="_text[field.Key]" />

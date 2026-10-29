@@ -25,7 +25,7 @@ else
                 <option value="">Selecciona…</option>
                 @foreach (var t in _templates)
                 {
-                    <option value="@t.Id">@t.Name (v@t.Version)</option>
+                    <option value="@t.Id">@t.Name (v@(t.Version))</option>
                 }
             </select>
         </label>
@@ -37,17 +37,16 @@ else
         </label>
     </p>
 
-    @if (_fields.Count > 0)
-    {
-        <button @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar ficha")</button>
-    }
 }
 
-@foreach (var field in _fields)
+@if (_fields.Count > 0)
 {
-    <p>
-        <label>
-            @field.Label @(field.Required ? "*" : "")
+    <div class="form-grid">
+        @foreach (var field in _fields)
+        {
+            <p class="@(field.Type == "LongText" ? "wide" : "")">
+            <label>
+                @field.Label @(field.Required ? "*" : "")
             <br />
             @switch (field.Type)
             {
@@ -75,7 +74,7 @@ else
                     }
                     break;
                 case "LongText":
-                    <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
+                    <textarea class="long-text" @bind="_text[field.Key]" rows="10"></textarea>
                     break;
                 case "Number":
                     <input type="number" step="any" @bind="_text[field.Key]" />
@@ -96,10 +95,17 @@ else
         {
             <span class="error">@string.Join(" ", messages)</span>
         }
+            </p>
+        }
+    </div>
+
+    <p class="actions">
+        <button class="primary" @onclick="SaveAsync" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar ficha")</button>
+        <a class="button" href="@($"/datos/{ClientId}")">Cancelar</a>
     </p>
 }
 
-<p><a href="@($"/clientes/{ClientId}")">Volver al cliente</a></p>
+<p class="crumbs"><a href="@($"/datos/{ClientId}")">Volver a los datos del cliente</a></p>
 
 @code {
     [Parameter] public Guid ClientId { get; set; }

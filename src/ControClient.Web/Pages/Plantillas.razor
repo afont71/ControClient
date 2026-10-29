@@ -36,11 +36,11 @@ else
             </p>
         }
 
-        <p>
-            <label>Nombre<br /><input @bind="_name" placeholder="Impresora" /></label>
-            <label>Descripción<br /><input @bind="_description" placeholder="Para qué sirve este tipo" /></label>
-            <label>Clave interna<br /><input @bind="_key" placeholder="impresora" disabled="@(_editingId is not null)" /></label>
-        </p>
+        <div class="form-grid">
+            <label>Nombre<input @bind="_name" placeholder="Impresora" /></label>
+            <label>Clave interna<input @bind="_key" placeholder="impresora" disabled="@(_editingId is not null)" /></label>
+            <label>Descripción<textarea @bind="_description" rows="3" placeholder="Para qué sirve este tipo"></textarea></label>
+        </div>
         <p class="muted">
             La clave es un identificador interno sin espacios ni acentos (por ejemplo
             <code>impresora</code>). No se muestra al usuario y no se puede cambiar después.
@@ -215,8 +215,8 @@ else
 
     private static string Describe(string type) => type switch
     {
-        nameof(FieldType.Text) => "Texto",
-        nameof(FieldType.LongText) => "Texto largo",
+        nameof(FieldType.Text) => "Texto corto (una línea)",
+        nameof(FieldType.LongText) => "Texto largo (varias líneas)",
         nameof(FieldType.Number) => "Número",
         nameof(FieldType.Date) => "Fecha",
         nameof(FieldType.Boolean) => "Sí/No",
