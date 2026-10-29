@@ -56,26 +56,49 @@ Endpoints útiles:
 
 ## Ejecutar con PostgreSQL y Entra ID
 
-1. Crea la base y aplica el esquema:
+### 1. Base de datos y roles (una vez)
+
+PostgreSQL 18 está instalado como servicio. Crea base y roles dedicados:
 
 ```powershell
-dotnet ef database update -p src/ControClient.Infrastructure -s src/ControClient.Web
+# Edita antes las dos contraseñas de scripts/db-setup.sql
+& 'C:\Program Files\PostgreSQL\18\bin\psql.exe' -U postgres -h 127.0.0.1 -f scripts/db-setup.sql
 ```
 
-2. Guarda los secretos fuera del repositorio (nunca en `appsettings`):
+Roles: `contoclient_owner` (migraciones, dueño del esquema) y `contoclient_app`
+(solo DML). La aplicación nunca usa el superusuario.
+
+### 2. Cadena de conexión y secretos
 
 ```powershell
-dotnet user-secrets set "ConnectionStrings:Default" "Host=...;Database=contoclient;Username=...;Password=..." --project src/ControClient.Web
+dotnet user-secrets init --project src/ControClient.Web
+dotnet user-secrets set "Database:Provider" "PostgreSQL" --project src/ControClient.Web
+dotnet user-secrets set "ConnectionStrings:Default" "Host=127.0.0.1;Port=5432;Database=contoclient;Username=contoclient_app;Password=<app>" --project src/ControClient.Web
+```
+
+### 3. Aplicar el esquema (con el usuario dueño)
+
+La fábrica de diseño lee `CONTOCLIENT_DB_OWNER` para no poner la contraseña en la línea de comandos:
+
+```powershell
+$env:CONTOCLIENT_DB_OWNER = "Host=127.0.0.1;Port=5432;Database=contoclient;Username=contoclient_owner;Password=<owner>"
+dotnet ef database update -p src/ControClient.Infrastructure -s src/ControClient.Web
+Remove-Item Env:CONTOCLIENT_DB_OWNER
+```
+
+### 4. Entra ID
+
+```powershell
 dotnet user-secrets set "AzureAd:TenantId" "<tenant>" --project src/ControClient.Web
 dotnet user-secrets set "AzureAd:ClientId" "<app-id>" --project src/ControClient.Web
 ```
 
-3. Registro de aplicación en Entra ID:
-   - Plataforma **Web** con redirección `https://<host>/signin-oidc`.
-   - Plataforma **Single-page/API** o exponer un ámbito para la APK (JWT Bearer).
-   - Política de acceso condicional que **exija MFA** (SEC-02).
+Registro de aplicación en Entra ID:
+- Plataforma **Web** con redirección `https://<host>/signin-oidc`.
+- Plataforma **Single-page/API** o exponer un ámbito para la APK (JWT Bearer).
+- Política de acceso condicional que **exija MFA** (SEC-02).
 
-4. En producción: `Authentication:Mode = Entra` y `Database:Provider = PostgreSQL`.
+En producción: `Authentication:Mode = Entra` y `Database:Provider = PostgreSQL`.
 
 ## Seguridad
 
