@@ -81,7 +81,7 @@ else
                     <input type="number" step="any" @bind="_text[field.Key]" />
                     break;
                 case "Date":
-                    <input type="date" value="@_text[field.Key]" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
+                    <input type="date" value="@TextOf(field.Key)" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
                     break;
                 default:
                     <input @bind="_text[field.Key]" />
@@ -139,7 +139,17 @@ else
             return;
 
         _fields = await Fichas.FieldsAsync(id);
+
+        // Inicializar el diccionario: sin esto, un campo de fecha rompe el render
+        // con KeyNotFoundException al no existir todavía la clave.
+        foreach (var field in _fields)
+        {
+            _text[field.Key] = string.Empty;
+            _bools[field.Key] = false;
+        }
     }
+
+    private string TextOf(string key) => _text.TryGetValue(key, out var value) ? value ?? string.Empty : string.Empty;
 
     private bool MultiContains(string key, string option) =>
         _multi.TryGetValue(key, out var list) && list.Contains(option);

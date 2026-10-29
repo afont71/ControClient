@@ -8,6 +8,12 @@
 
 <h1>Tipos de ficha</h1>
 
+<p class="muted">
+    Un tipo de ficha es una plantilla con sus campos. Por ejemplo: <em>Impresora</em> con
+    <em>nombre</em>, <em>modelo</em>, <em>IP</em> y <em>fecha de compra</em>.
+    Aquí se define qué se puede rellenar después en cada cliente.
+</p>
+
 @if (_message is not null)
 {
     <p class="@(_isError ? "error" : "ok")">@_message</p>
@@ -19,57 +25,91 @@
 }
 else
 {
-    <section>
-        <h2>Nuevo tipo</h2>
+    <section class="panel">
+        <h2>@(_editingId is null ? "Nuevo tipo" : $"Editar «{_name}»")</h2>
+
+        @if (_editingId is not null)
+        {
+            <p class="muted">
+                Guardar crea una versión nueva del tipo. Las fichas ya rellenadas conservan
+                la versión con la que se crearon.
+            </p>
+        }
+
         <p>
-            <label>Clave<br /><input @bind="_key" placeholder="p. ej. impresora" /></label>
             <label>Nombre<br /><input @bind="_name" placeholder="Impresora" /></label>
-            <label>Descripción<br /><input @bind="_description" /></label>
+            <label>Descripción<br /><input @bind="_description" placeholder="Para qué sirve este tipo" /></label>
+            <label>Clave interna<br /><input @bind="_key" placeholder="impresora" disabled="@(_editingId is not null)" /></label>
+        </p>
+        <p class="muted">
+            La clave es un identificador interno sin espacios ni acentos (por ejemplo
+            <code>impresora</code>). No se muestra al usuario y no se puede cambiar después.
         </p>
 
+        <h3>Campos</h3>
         <table>
-            <thead><tr><th>Clave</th><th>Etiqueta</th><th>Tipo</th><th>Obligatorio</th><th>Opciones (separadas por coma)</th><th></th></tr></thead>
+            <thead>
+                <tr><th>Etiqueta (lo que se ve)</th><th>Clave interna</th><th>Tipo</th><th>Obligatorio</th><th>Valores de la lista</th><th></th></tr>
+            </thead>
             <tbody>
                 @foreach (var f in _fields)
                 {
                     <tr>
-                        <td><input @bind="f.Key" /></td>
-                        <td><input @bind="f.Label" /></td>
+                        <td><input @bind="f.Label" placeholder="Modelo" /></td>
+                        <td><input @bind="f.Key" placeholder="modelo" disabled="@(_editingId is not null && f.Locked)" /></td>
                         <td>
                             <select @bind="f.Type">
                                 @foreach (var type in Enum.GetNames<FieldType>())
                                 {
-                                    <option value="@type">@type</option>
+                                    <option value="@type">@Describe(type)</option>
                                 }
                             </select>
                         </td>
                         <td><input type="checkbox" @bind="f.Required" /></td>
-                        <td><input @bind="f.OptionsCsv" /></td>
+                        <td>
+                            @if (f.Type is nameof(FieldType.Select) or nameof(FieldType.MultiSelect))
+                            {
+                                <input @bind="f.OptionsCsv" placeholder="Sí, No, No aplica" />
+                            }
+                            else
+                            {
+                                <span class="muted">—</span>
+                            }
+                        </td>
                         <td><button @onclick="() => RemoveField(f)">Quitar</button></td>
                     </tr>
                 }
             </tbody>
         </table>
+        <p class="muted">
+            «Valores de la lista» solo se usa en los tipos Lista y Lista múltiple: escribe las
+            opciones separadas por comas, por ejemplo <code>Sí, No, No aplica</code>.
+        </p>
 
         <p>
             <button @onclick="AddField">+ Añadir campo</button>
-            <button @onclick="CreateAsync" disabled="@_busy">Crear tipo</button>
+            <button @onclick="SaveAsync" disabled="@_busy">@(_editingId is null ? "Crear tipo" : "Guardar nueva versión")</button>
+            @if (_editingId is not null)
+            {
+                <button @onclick="CancelEdit">Cancelar</button>
+            }
         </p>
     </section>
 
     <section>
         <h2>Tipos existentes</h2>
         <table>
-            <thead><tr><th>Nombre</th><th>Clave</th><th>Versión</th><th>Campos</th><th>Activo</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Descripción</th><th>Clave</th><th>Versión</th><th>Campos</th><th></th></tr></thead>
             <tbody>
                 @foreach (var t in _templates)
                 {
                     <tr>
                         <td>@t.Name</td>
+                        <td>@(t.Description ?? "—")</td>
                         <td><code>@t.Key</code></td>
                         <td>@t.Version</td>
                         <td>@t.Fields</td>
-                        <td>@(t.IsActive ? "Sí" : "No")</td>
+                        <td><button @onclick="() => EditAsync(t)">Editar</button></td>
                     </tr>
                 }
             </tbody>
@@ -83,6 +123,7 @@ else
     private string? _key;
     private string? _name;
     private string? _description;
+    private Guid? _editingId;
     private string? _message;
     private bool _isError;
     private bool _busy;
@@ -94,6 +135,7 @@ else
         public string Type { get; set; } = nameof(FieldType.Text);
         public bool Required { get; set; }
         public string? OptionsCsv { get; set; }
+        public bool Locked { get; set; }
     }
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -104,7 +146,41 @@ else
 
     private void RemoveField(Draft draft) => _fields.Remove(draft);
 
-    private async Task CreateAsync()
+    private async Task EditAsync(TemplatesPageService.TemplateRow template)
+    {
+        _editingId = template.Id;
+        _key = template.Key;
+        _name = template.Name;
+        _description = template.Description;
+
+        var existing = await Servicio.FieldsAsync(template.Id);
+        _fields.Clear();
+        foreach (var f in existing)
+        {
+            _fields.Add(new Draft
+            {
+                Key = f.Key,
+                Label = f.Label,
+                Type = f.Type,
+                Required = f.Required,
+                OptionsCsv = f.OptionsCsv,
+                Locked = true
+            });
+        }
+
+        if (_fields.Count == 0)
+            _fields.Add(new Draft());
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null;
+        _key = _name = _description = null;
+        _fields.Clear();
+        _fields.Add(new Draft());
+    }
+
+    private async Task SaveAsync()
     {
         _busy = true;
         try
@@ -114,17 +190,21 @@ else
                 .Select(f => new TemplatesPageService.FieldDraft(f.Key, f.Label, f.Type, f.Required, f.OptionsCsv))
                 .ToList();
 
-            var (id, error) = await Servicio.CreateAsync(_key ?? string.Empty, _name ?? string.Empty, _description, drafts);
+            var (id, error) = _editingId is Guid editing
+                ? await Servicio.UpdateAsync(editing, _name ?? string.Empty, _description, drafts)
+                : await Servicio.CreateAsync(_key ?? string.Empty, _name ?? string.Empty, _description, drafts);
+
             if (id is null)
             {
-                SetMessage(error ?? "No se pudo crear.", true);
+                SetMessage(error ?? "No se pudo guardar.", true);
                 return;
             }
 
-            SetMessage("Tipo creado. Ya aparece al añadir información a un cliente.", false);
-            _key = _name = _description = null;
-            _fields.Clear();
-            _fields.Add(new Draft());
+            SetMessage(_editingId is null
+                ? "Tipo creado. Ya aparece al añadir información a un cliente."
+                : "Nueva versión guardada. Se usará en las próximas fichas.", false);
+
+            CancelEdit();
             await LoadAsync();
         }
         finally
@@ -132,6 +212,21 @@ else
             _busy = false;
         }
     }
+
+    private static string Describe(string type) => type switch
+    {
+        nameof(FieldType.Text) => "Texto",
+        nameof(FieldType.LongText) => "Texto largo",
+        nameof(FieldType.Number) => "Número",
+        nameof(FieldType.Date) => "Fecha",
+        nameof(FieldType.Boolean) => "Sí/No",
+        nameof(FieldType.Select) => "Lista",
+        nameof(FieldType.MultiSelect) => "Lista múltiple",
+        nameof(FieldType.Email) => "Correo",
+        nameof(FieldType.Url) => "Enlace",
+        nameof(FieldType.Ip) => "Dirección IP",
+        _ => type
+    };
 
     private void SetMessage(string text, bool error)
     {
@@ -141,6 +236,7 @@ else
 }
 
 <style>
+    .panel { border: 1px solid #E1E7EF; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
     table { border-collapse: collapse; width: 100%; margin: .5rem 0; }
     th, td { border-bottom: 1px solid #E1E7EF; padding: .35rem; text-align: left; }
     input, select { padding: .3rem; }

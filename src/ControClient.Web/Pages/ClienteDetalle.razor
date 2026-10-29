@@ -24,6 +24,7 @@ else if (_client is null)
 else
 {
     <h1>@_client.Name</h1>
+    <p><a class="button" href="@($"/datos/{Id}")">Ver y editar información del cliente</a> <a href="/clientes">Volver a clientes</a></p>
     <p class="muted">
         Alias: @(_client.Alias ?? "—") · Estado: <strong>@_client.Status</strong> ·
         Creado: @_client.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")
@@ -37,7 +38,7 @@ else
     @if (_client.CanEdit)
     {
         <section>
-            <h2>Datos</h2>
+            <h2>Datos de la empresa</h2>
             <EditForm Model="_form" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
                 <p>
@@ -58,104 +59,12 @@ else
             </EditForm>
         </section>
 
-        <section>
-            <h2> Permisos de acceso</h2>
-            <p class="muted">Sin concesión vigente, el usuario no ve este cliente. Un administrador no puede revelar secretos por su rol.</p>
-
-            @if (_grants.Count == 0)
-            {
-                <p>Sin concesiones.</p>
-            }
-            else
-            {
-                <table>
-                    <thead><tr><th>Usuario</th><th>Acciones</th><th>Concedida</th><th>Caduca</th><th></th></tr></thead>
-                    <tbody>
-                        @foreach (var g in _grants)
-                        {
-                            <tr>
-                                <td>@g.UserName</td>
-                                <td>@g.Actions</td>
-                                <td>@g.GrantedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
-                                <td>@(g.ExpiresAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—")</td>
-                                <td><button @onclick="() => RevokeAsync(g.Id)">Revocar</button></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-
-            @if (_users.Count > 0)
-            {
-                <h3>Añadir o actualizar concesión</h3>
-                <p>
-                    <label>Usuario<br />
-                        <InputSelect @bind-Value="_grantForm.UserId">
-                            <option value="">Selecciona…</option>
-                            @foreach (var u in _users)
-                            {
-                                <option value="@u.Id">@u.Name (@u.Role)</option>
-                            }
-                        </InputSelect>
-                    </label>
-                </p>
-                <p>
-                    <label><input type="checkbox" @bind="_grantForm.View" /> Ver</label>
-                    <label><input type="checkbox" @bind="_grantForm.Edit" /> Editar</label>
-                    <label><input type="checkbox" @bind="_grantForm.Reveal" /> Revelar secretos</label>
-                </p>
-                <button @onclick="GrantAsync" disabled="@_saving">Conceder</button>
-            }
-        </section>
     }
     else
     {
         <p class="muted">Tienes acceso de consulta: no puedes modificar este cliente.</p>
     }
 
-    <section>
-        <h2>Información del cliente</h2>
-        <p class="muted">Datos tipados por tipo: equipos, servidores, servicios, licencias, contactos, redes…</p>
-
-        @foreach (var template in _templates)
-        {
-            var items = _records.Where(r => r.TemplateId == template.Id).ToList();
-            <div class="info-group">
-                <h3>@template.Name <span class="count">(@items.Count)</span>
-                    @if (_client.CanEdit)
-                    {
-                        <a class="small" href="@($"/clientes/{Id}/fichas/nueva?templateId={template.Id}")">Añadir</a>
-                    }
-                </h3>
-
-                @if (items.Count == 0)
-                {
-                    <p class="muted">Sin registros.</p>
-                }
-                else
-                {
-                    <table>
-                        <thead><tr><th>Título</th><th>Versión</th><th>Actualizada</th></tr></thead>
-                        <tbody>
-                            @foreach (var r in items)
-                            {
-                                <tr>
-                                    <td><a href="@($"/fichas/{r.Id}")">@r.Title</a></td>
-                                    <td>@r.Version</td>
-                                    <td>@(r.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—")</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                }
-            </div>
-        }
-
-        @if (_records.Count == 0)
-        {
-            <p class="muted">Este cliente aún no tiene información registrada.</p>
-        }
-    </section>
 
     <section>
         <h2>Documentación</h2>
@@ -230,79 +139,6 @@ else
         }
     </section>
 
-    <section>
-        <h2>Bóveda</h2>
-
-        @if (_vaultMessage is not null)
-        {
-            <p class="@(_vaultIsError ? "error" : "ok")">@_vaultMessage</p>
-        }
-
-        @if (!_canReveal)
-        {
-            <p class="muted">Puedes ver la lista; revelar secretos exige rol técnico y permiso explícito.</p>
-        }
-
-        @if (_vaultItems.Count == 0)
-        {
-            <p>Sin credenciales.</p>
-        }
-        else
-        {
-            <table>
-                <thead><tr><th>Nombre</th><th>Tipo</th><th>Usuario</th><th>Versión</th><th>Actualizada</th><th></th></tr></thead>
-                <tbody>
-                    @foreach (var v in _vaultItems)
-                    {
-                        <tr>
-                            <td>@v.Name</td>
-                            <td>@v.Kind</td>
-                            <td>@(v.Username ?? "—")</td>
-                            <td>@v.CurrentVersion</td>
-                            <td>@v.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
-                            <td>
-                                @if (_canReveal)
-                                {
-                                    @if (_revealed.TryGetValue(v.Id, out var secret))
-                                    {
-                                        <code class="secret">@secret</code>
-                                        <button @onclick="() => Hide(v.Id)">Ocultar</button>
-                                    }
-                                    else
-                                    {
-                                        <button @onclick="() => RevealAsync(v.Id)">Revelar</button>
-                                    }
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-
-        @if (_client.CanEdit)
-        {
-            <h3>Nueva credencial</h3>
-            <p><label>Nombre<br /><input @bind="_vaultName" placeholder="Ej. FortiGate sede" /></label></p>
-            <p>
-                <label>Tipo<br />
-                    <select @bind="_vaultKind">
-                        @foreach (var kind in Enum.GetNames<VaultItemKind>())
-                        {
-                            <option value="@kind">@kind</option>
-                        }
-                    </select>
-                </label>
-            </p>
-            <p><label>Usuario<br /><input @bind="_vaultUser" /></label></p>
-            <p><label>URL<br /><input @bind="_vaultUrl" placeholder="https://" /></label></p>
-            <p><label>Notas (no secretas)<br /><input @bind="_vaultNotes" /></label></p>
-            <p><label>Secreto<br /><input type="password" @bind="_vaultSecret" /></label></p>
-            <button @onclick="CreateVaultItemAsync" disabled="@_vaultSaving">
-                @(_vaultSaving ? "Guardando…" : "Guardar credencial")
-            </button>
-        }
-    </section>
 
     <p><a href="/clientes">Volver a clientes</a></p>
 }

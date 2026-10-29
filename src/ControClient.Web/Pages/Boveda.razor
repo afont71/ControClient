@@ -2,12 +2,17 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject VaultPageService Servicio
+@inject NavService Nav
 
 <PageTitle>Bóveda</PageTitle>
 
 <h1>Bóveda</h1>
 
-@if (_status is null)
+@if (!_isAdmin)
+{
+    <p class="muted">Solo un administrador puede gestionar la bóveda.</p>
+}
+else if (_status is null)
 {
     <p>Cargando…</p>
 }
@@ -61,8 +66,14 @@ else
     private string? _message;
     private bool _isError;
     private bool _busy;
+    private bool _isAdmin;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _isAdmin = await Nav.IsAdminAsync();
+        if (_isAdmin)
+            await LoadAsync();
+    }
 
     private async Task LoadAsync() => _status = await Servicio.StatusAsync();
 

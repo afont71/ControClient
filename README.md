@@ -25,7 +25,8 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Pre-registro por correo antes del primer acceso | ✅ |
 | Eliminar fichas pendientes; desactivar usuarios reales | ✅ |
 | Modo cerrado: solo entra quien está pre-registrado | ✅ |
-| Información del cliente por tipo (equipos, servicios, licencias, contactos, redes) | ✅ |
+| Datos por cliente: secciones por tipo, solo con contenido | ✅ |
+| Permisos fuera de la ficha; se gestionan en grupos y usuarios | ✅ |
 | Vista global de información con filtros y gestión de tipos desde la UI | ✅ |
 | Vencimientos: licencias, garantías y renovaciones por horizonte | ✅ |
 | Grupos: miembros y clientes con permisos, asignación masiva | ✅ |

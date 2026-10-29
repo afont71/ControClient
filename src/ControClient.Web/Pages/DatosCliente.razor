@@ -1,0 +1,135 @@
+@page "/datos/{ClientId:guid}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ClientPageService Clientes
+@inject FormPageService Fichas
+@inject NavigationManager Nav
+
+<PageTitle>Datos del cliente</PageTitle>
+
+@if (_client is null)
+{
+    <h1>Cliente no disponible</h1>
+    <p class="muted">No existe o no tienes acceso a él.</p>
+    <a href="/datos">Volver</a>
+}
+else
+{
+    <p class="crumbs"><a href="/datos">Datos</a> / <a href="/clientes/@ClientId">Empresa</a></p>
+    <h1>@_client.Name</h1>
+    <p class="muted">
+        Alias: @(_client.Alias ?? "—") · Estado: @_client.Status
+        @if (!_client.CanEdit)
+        {
+            <span> · solo consulta</span>
+        }
+    </p>
+
+    @if (_message is not null)
+    {
+        <p class="@(_isError ? "error" : "ok")">@_message</p>
+    }
+
+    @if (_client.CanEdit)
+    {
+        <section class="add">
+            <h2>Añadir información</h2>
+            <p>
+                <select @bind="_newTemplateId">
+                    <option value="">Tipo de ficha…</option>
+                    @foreach (var t in _templates)
+                    {
+                        <option value="@t.Id">@t.Name</option>
+                    }
+                </select>
+                <button @onclick="AddAsync" disabled="@string.IsNullOrEmpty(_newTemplateId)">Añadir</button>
+                <span class="muted">Se abre el formulario del tipo elegido.</span>
+            </p>
+        </section>
+    }
+
+    @if (_withRecords.Count == 0)
+    {
+        <p class="empty">Este cliente todavía no tiene información registrada.</p>
+    }
+    else
+    {
+        @foreach (var group in _withRecords)
+        {
+            <section class="block">
+                <h2>@group.Template.Name <span class="count">@group.Records.Count</span>
+                    @if (_client.CanEdit)
+                    {
+                        <a class="add-link" href="@($"/clientes/{ClientId}/fichas/nueva?templateId={group.Template.Id}")">+ Añadir</a>
+                    }
+                </h2>
+                <table>
+                    <thead><tr><th>Título</th><th>Actualizada</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var r in group.Records)
+                        {
+                            <tr>
+                                <td>@r.Title</td>
+                                <td>@(r.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? r.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy"))</td>
+                                <td><a href="@($"/fichas/{r.Id}")">@(_client.CanEdit ? "Ver / editar" : "Ver")</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </section>
+        }
+    }
+}
+
+@code {
+    [Parameter] public Guid ClientId { get; set; }
+
+    private ClientPageService.ClientDetail? _client;
+    private IReadOnlyList<FormPageService.TemplateRow> _templates = [];
+    private IReadOnlyList<FormPageService.RecordRow> _records = [];
+    private List<(FormPageService.TemplateRow Template, List<FormPageService.RecordRow> Records)> _withRecords = [];
+    private string _newTemplateId = string.Empty;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _client = await Clientes.GetAsync(ClientId);
+        if (_client is null)
+            return;
+
+        _templates = await Fichas.TemplatesAsync();
+        _records = await Fichas.RecordsAsync(ClientId);
+
+        _withRecords = _templates
+            .Select(t => (t, _records.Where(r => r.TemplateId == t.Id).ToList()))
+            .Where(x => x.Item2.Count > 0)
+            .ToList();
+    }
+
+    private Task AddAsync()
+    {
+        if (!Guid.TryParse(_newTemplateId, out var templateId))
+            return Task.CompletedTask;
+
+        Nav.NavigateTo($"/clientes/{ClientId}/fichas/nueva?templateId={templateId}");
+        return Task.CompletedTask;
+    }
+}
+
+<style>
+    .crumbs { font-size: .9rem; }
+    .block { margin-top: 1.5rem; }
+    .block h2 { display: flex; align-items: baseline; gap: .75rem; }
+    .count { background: #EEF2F7; border-radius: 10px; padding: .05rem .5rem; font-size: .85rem; }
+    .add-link { font-size: .85rem; font-weight: 400; }
+    .add { margin-top: 1rem; }
+    .empty { margin-top: 1.5rem; color: #4B5563; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .45rem; text-align: left; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    .ok { color: #1B5E20; }
+</style>

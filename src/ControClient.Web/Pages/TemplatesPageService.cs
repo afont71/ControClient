@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Forms;
 using ControClient.Domain.Users;
@@ -23,7 +23,31 @@ public sealed class TemplatesPageService(IServiceScopeFactory scopes, Authentica
             return null;
 
         var templates = await forms.ListTemplatesAsync(includeInactive: true);
-        return templates.Select(t => new TemplateRow(t.Id, t.Key, t.Name, t.Description, t.Version, t.IsActive, t.FieldCount)).ToList();
+
+        // Solo la última versión de cada clave: es la que se usa al crear fichas.
+        return templates
+            .GroupBy(t => t.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(t => t.Version).First())
+            .OrderBy(t => t.Name)
+            .Select(t => new TemplateRow(t.Id, t.Key, t.Name, t.Description, t.Version, t.IsActive, t.FieldCount))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<FieldDraft>> FieldsAsync(Guid templateId)
+    {
+        using var scope = scopes.CreateScope();
+        var forms = scope.ServiceProvider.GetRequiredService<FormService>();
+        var template = await forms.GetTemplateAsync(templateId);
+        if (template is null)
+            return [];
+
+        return template.Fields.OrderBy(f => f.Order).Select(f => new FieldDraft(
+            f.Key,
+            f.Label,
+            f.Type.ToString(),
+            f.IsRequired,
+            f.OptionsJson is null ? null : string.Join(", ", JsonSerializer.Deserialize<string[]>(f.OptionsJson) ?? [])
+        )).ToList();
     }
 
     public async Task<(Guid? Id, string? Error)> CreateAsync(string key, string name, string? description, IReadOnlyList<FieldDraft> fields)
@@ -60,6 +84,56 @@ public sealed class TemplatesPageService(IServiceScopeFactory scopes, Authentica
 
             var template = await forms.CreateTemplateAsync(key, name, description, specs);
             return (template.Id, null);
+        }
+        catch (ArgumentException ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Guardar cambios de un tipo: como los tipos están versionados, crear una
+    /// nueva versión con los campos resultantes. Las fichas antiguas conservan la
+    /// versión con la que se crearon.
+    /// </summary>
+    public async Task<(Guid? Id, string? Error)> UpdateAsync(
+        Guid templateId, string name, string? description, IReadOnlyList<FieldDraft> fields)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (actor, forms) = await ResolveAsync(sp);
+        if (actor is null || !actor.IsIn(AppRole.Administrator))
+            return (null, "Solo un administrador puede modificar tipos de ficha.");
+
+        var template = await forms.GetTemplateAsync(templateId);
+        if (template is null)
+            return (null, "El tipo no existe.");
+
+        if (string.IsNullOrWhiteSpace(name))
+            return (null, "El nombre es obligatorio.");
+
+        if (fields.Count == 0)
+            return (null, "El tipo debe tener al menos un campo.");
+
+        if (fields.Any(f => string.IsNullOrWhiteSpace(f.Key) || string.IsNullOrWhiteSpace(f.Label)))
+            return (null, "Cada campo necesita clave y etiqueta.");
+
+        if (fields.GroupBy(f => f.Key, StringComparer.OrdinalIgnoreCase).Any(g => g.Count() > 1))
+            return (null, "Hay claves de campo repetidas.");
+
+        try
+        {
+            var specs = fields.Select((f, index) => new FormService.FieldSpec(
+                f.Key.Trim(),
+                f.Label.Trim(),
+                Enum.TryParse<FieldType>(f.Type, ignoreCase: true, out var type) ? type : FieldType.Text,
+                f.Required,
+                ParseOptions(f.OptionsCsv),
+                null,
+                index + 1)).ToList();
+
+            var updated = await forms.CreateTemplateAsync(template.Key, name, description, specs);
+            return (updated.Id, null);
         }
         catch (ArgumentException ex)
         {

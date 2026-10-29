@@ -1,19 +1,23 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
+@inject NavService Nav
 
 <div class="app-shell">
     <header class="app-header">
         <a class="brand" href="/">ControClient</a>
         <nav class="app-nav">
             <a href="/clientes">Clientes</a>
-            <a href="/informacion">Información</a>
+            <a href="/datos">Datos</a>
             <a href="/vencimientos">Vencimientos</a>
             <a href="/buscar">Buscar</a>
-            <a href="/boveda">Bóveda</a>
-            <a href="/usuarios">Usuarios</a>
-            <a href="/grupos">Grupos</a>
-            <a href="/auditoria">Auditoría</a>
-            <a href="/plantillas">Tipos</a>
+            @if (_isAdmin)
+            {
+                <a href="/boveda">Bóveda</a>
+                <a href="/usuarios">Usuarios</a>
+                <a href="/grupos">Grupos</a>
+                <a href="/auditoria">Auditoría</a>
+                <a href="/plantillas">Tipos</a>
+            }
         </nav>
         <AuthorizeView>
             <Authorized>
@@ -28,23 +32,11 @@
     </main>
 </div>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+@code {
+    private bool _isAdmin;
 
-<style>
-    .app-shell { min-height: 100vh; display: flex; flex-direction: column; }
-    .app-header {
-        display: flex; align-items: center; gap: 1.5rem;
-        padding: .75rem 1.25rem; border-bottom: 1px solid #E1E7EF; background: #FFFFFF;
+    protected override async Task OnInitializedAsync()
+    {
+        _isAdmin = await Nav.IsAdminAsync();
     }
-    .brand { font-weight: 700; color: #006EB3; text-decoration: none; }
-    .app-nav { display: flex; gap: 1rem; }
-    .app-nav a { color: #1E2329; text-decoration: none; }
-    .app-nav a:hover { color: #006EB3; }
-    .user { margin-left: auto; color: #4B5563; font-size: .9rem; }
-    .logout { color: #B00020; text-decoration: none; margin-left: .75rem; font-size: .9rem; }
-    .app-main { padding: 1.25rem 1.5rem; flex: 1; }
-</style>
+}
