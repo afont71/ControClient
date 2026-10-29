@@ -1,3 +1,4 @@
+﻿using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
 using ControClient.Infrastructure;
 using ControClient.Web.Components;
@@ -86,6 +87,24 @@ else
 {
     // Web: cookie de Entra ID; API: JWT Bearer del mismo tenant (SEC-01, SEC-03).
     authBuilder.AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+
+    // Refuerzo explícito: flujo de código con PKCE (id_token está deshabilitado en
+    // el registro) y secreto inyectado aunque el enlace automático falle.
+    builder.Services.Configure<OpenIdConnectOptions>(
+        Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
+        options =>
+        {
+            options.ResponseType = "code";
+            options.UsePkce = true;
+        });
+
+    builder.Services.Configure<MicrosoftIdentityOptions>(options =>
+    {
+        var secret = builder.Configuration["AzureAd:ClientSecret"];
+        if (!string.IsNullOrWhiteSpace(secret))
+            options.ClientSecret = secret;
+    });
+
     authBuilder.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"), JwtBearerDefaults.AuthenticationScheme);
 
     authBuilder.AddPolicyScheme("CookieOrBearer", "Cookie or Bearer", options =>
