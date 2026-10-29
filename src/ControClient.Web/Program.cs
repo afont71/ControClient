@@ -202,6 +202,20 @@ app.MapDocumentEndpoints();
 app.MapSearchEndpoints();
 app.MapOpenApi();
 
+// Diagnóstico de claims: solo en desarrollo. Muestra tipos y valores enmascarados
+// para entender qué emite el tenant sin exponer datos sensibles completos.
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/api/v1/system/claims", (System.Security.Claims.ClaimsPrincipal principal) =>
+        Results.Ok(principal.Claims.Select(c => new
+        {
+            type = c.Type,
+            value = c.Value.Length <= 6 ? c.Value : c.Value[..6] + "…",
+            length = c.Value.Length
+        }).OrderBy(c => c.type)))
+       .RequireAuthorization();
+}
+
 // Plantillas iniciales (idempotente). En producción puede desactivarse por configuración.
 if (app.Configuration.GetValue("Seeding:DefaultTemplates", true))
 {
