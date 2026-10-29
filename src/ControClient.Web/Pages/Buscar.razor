@@ -1,0 +1,92 @@
+@page "/buscar"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject SearchPageService Buscador
+
+<PageTitle>Buscar</PageTitle>
+
+<h1>Buscar</h1>
+
+<p class="muted">Busca en clientes, fichas, documentos y credenciales. Nunca busca dentro de los secretos.</p>
+
+<p>
+    <input @bind="_term" @bind:event="oninput" @onkeyup="OnKeyUp" placeholder="Al menos 2 caracteres…" />
+</p>
+
+@if (_error is not null)
+{
+    <p class="error">@_error</p>
+}
+
+@if (_loading)
+{
+    <p>Buscando…</p>
+}
+else if (_results.Count == 0 && !string.IsNullOrWhiteSpace(_term))
+{
+    <p>Sin resultados.</p>
+}
+else if (_results.Count > 0)
+{
+    <table>
+        <thead><tr><th>Tipo</th><th>Cliente</th><th>Título</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var hit in _results)
+            {
+                <tr>
+                    <td>@hit.Type</td>
+                    <td>@hit.ClientName</td>
+                    <td>@hit.Title @if (hit.Subtitle is not null) { <span class="muted">· @hit.Subtitle</span> }</td>
+                    <td><a href="@Link(hit)">Abrir</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string? _term;
+    private IReadOnlyList<SearchPageService.HitRow> _results = [];
+    private string? _error;
+    private bool _loading;
+
+    private async Task OnKeyUp(KeyboardEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(_term) || _term.Trim().Length < 2)
+        {
+            _results = [];
+            return;
+        }
+
+        _loading = true;
+        _error = null;
+        try
+        {
+            _results = await Buscador.SearchAsync(_term);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static string Link(SearchPageService.HitRow hit) => hit.Type switch
+    {
+        "Cliente" => $"/clientes/{hit.Id}",
+        "Ficha" => $"/fichas/{hit.Id}",
+        "Documento" => $"/api/v1/documents/{hit.Id}/content",
+        _ => $"/clientes/{hit.ClientId}"
+    };
+}
+
+<style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .45rem; text-align: left; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    input { padding: .5rem; min-width: 24rem; }
+</style>

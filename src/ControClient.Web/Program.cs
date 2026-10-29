@@ -24,6 +24,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddOpenApi();
 
 // La raíz del almacén documental se resuelve aquí. Por defecto va a datos locales
 // del usuario: nunca dentro del repositorio. En producción se configura absoluta.
@@ -41,6 +42,7 @@ builder.Services.AddScoped<ControClient.Web.Pages.ClientPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.FormPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.DocumentPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.VaultPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.SearchPageService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
@@ -115,6 +117,8 @@ app.MapClientEndpoints();
 app.MapFormEndpoints();
 app.MapDocumentEndpoints();
  app.MapVaultEndpoints();
+app.MapSearchEndpoints();
+app.MapOpenApi();
 
 // Plantillas iniciales (idempotente). En producción puede desactivarse por configuración.
 if (app.Configuration.GetValue("Seeding:DefaultTemplates", true))

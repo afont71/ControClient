@@ -20,12 +20,14 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Bóveda: constitución, desellado por administrador, revelado y recuperación | ✅ |
 | Cifrado por envoltura (DEK por secreto) y clave protegida con DPAPI | ✅ |
 | Pantallas de bóveda (estado y credenciales por cliente) | ✅ |
+| Búsqueda global filtrada por alcance (sin secretos) | ✅ |
+| Contrato OpenAPI en `/openapi/v1.json` | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
-| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 45 |
+| Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda, búsqueda y auditoría | ✅ |
+| Pruebas automatizadas | ✅ 49 |
 | CI (build + test) | ✅ |
 
-Pendiente: búsqueda y OpenAPI (5), Android (6), migración (7).
+Pendiente: Android (6), migración (7) y conectar el tenant real de Entra ID.
 
 ## Estructura
 
@@ -86,9 +88,18 @@ Endpoints útiles:
 | `POST /api/v1/clients/{id}/vault-items` | editar el cliente | crea credencial cifrada |
 | `POST /api/v1/vault-items/{id}/versions` | editar el cliente | nueva versión del secreto |
 | `POST /api/v1/vault-items/{id}/reveal` | rol técnico/custodio **y** concesión `RevealSecret` | devuelve el secreto y audita el revelado |
+| `GET /api/v1/search?q=&limit=` | sesión; alcance aplicado | clientes, fichas, documentos y credenciales (solo metadatos) |
+| `GET /openapi/v1.json` | **anónimo** en esta etapa | contrato OpenAPI generado |
 | `GET /api/v1/audit/events` | administrador, auditor o custodio | últimos 50 eventos |
 
 Acciones de una concesión (`actions`, flags): `1` ver, `2` editar, `4` revelar secretos. Se combinan sumando: `3` = ver y editar; `7` = todo.
+
+### Búsqueda
+
+- Busca en nombre/alias de cliente, título y plantilla de ficha, nombre y fichero de documento, y metadatos de credencial (nombre, usuario, URL, notas).
+- **No indexa valores secretos** ni el contenido de los documentos: solo metadatos.
+- El alcance por cliente se aplica antes de consultar, no después.
+- El contrato OpenAPI está abierto en esta etapa; en producción debe restringirse a administración o a la red interna.
 
 ### Documentos
 

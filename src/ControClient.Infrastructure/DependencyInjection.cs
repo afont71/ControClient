@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Security;
 using ControClient.Infrastructure.Auditing;
 using ControClient.Infrastructure.Data;
@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddSingleton<ControClient.Infrastructure.Vault.IVaultKeyProtector, ControClient.Infrastructure.Vault.WindowsDpapiProtector>();
         services.AddSingleton<ControClient.Infrastructure.Vault.VaultKeyRing>();
         services.AddScoped<ControClient.Infrastructure.Vault.VaultService>();
+        services.AddScoped<ControClient.Infrastructure.Search.SearchService>();
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
         return services;
