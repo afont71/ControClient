@@ -61,6 +61,16 @@ if (!builder.Environment.IsDevelopment() && !useDevAuth)
             "Configuración incompleta: define AzureAd:TenantId y AzureAd:ClientId (user-secrets o variables de entorno) " +
             "antes de arrancar en producción. Ver docs/entra-id-setup.md.");
     }
+
+    // Blazor Server es un cliente confidencial: el canje del código exige secreto o certificado.
+    var hasSecret = !IsPlaceholder(builder.Configuration["AzureAd:ClientSecret"]);
+    var hasCertificate = !string.IsNullOrWhiteSpace(builder.Configuration["AzureAd:ClientCertificates:0:SourceType"]);
+    if (!hasSecret && !hasCertificate)
+    {
+        throw new InvalidOperationException(
+            "Configuración incompleta: define AzureAd:ClientSecret o AzureAd:ClientCertificates. " +
+            "El flujo de código de un cliente confidencial no funciona sin una credencial. Ver docs/entra-id-setup.md.");
+    }
 }
 
 var authBuilder = builder.Services.AddAuthentication();

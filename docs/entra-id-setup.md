@@ -18,11 +18,34 @@ Anota:
 - **Id. de aplicación (cliente)**: será `AzureAd:ClientId`.
 - **Id. de directorio (inquilino)**: será `AzureAd:TenantId`.
 
-En **Certificados y secretos** no hace falta secreto: el flujo es de código de
-autorización con PKCE y cookies, sin secreto de cliente.
+**Sí hace falta credencial de cliente.** Blazor Server es un cliente confidencial:
+el canje del código en el servidor exige secreto o certificado. En
+**Certificados y secretos → Nuevo secreto de cliente** crea uno (6–12 meses) y
+copia el **Valor** en ese momento; será `AzureAd:ClientSecret`. En producción es
+preferible un **certificado** (`AzureAd:ClientCertificates`), porque el secreto
+caduca y hay que rotarlo.
 
 En **Autenticación → Configuración de plataforma → Web**, añade también
 `https://<host>/signout-callback-oidc`.
+
+### Desarrollo con localhost
+
+`http://localhost` es una excepción admitida por Microsoft y **el puerto no se
+compara**, así que registra las rutas sin puerto y sirve para cualquier puerto:
+
+```
+http://localhost/signin-oidc
+http://localhost/signout-callback-oidc
+```
+
+No registres varios localhost que solo cambien el puerto: Entra elegiría uno al
+azar. Arranca con `dotnet run --project src/ControClient.Web --urls http://localhost:5080`.
+Si el portal rechaza HTTP en la plataforma Web, usa `dotnet dev-certs https --trust`
+y registra `https://localhost/signin-oidc`. No uses la plataforma «Móvil y
+escritorio» para este caso: convertiría la aplicación en cliente público.
+
+Cuando pases a producción, registra el host interno por HTTPS y elimina las dos
+rutas de localhost (o mantén un registro aparte `ControClient-Dev`).
 
 ## 2. API para la APK Android
 
@@ -54,6 +77,7 @@ pero mantén la política de acceso condicional.
 dotnet user-secrets set "Authentication:Mode" "Entra" --project src/ControClient.Web
 dotnet user-secrets set "AzureAd:TenantId" "<tenant-id>" --project src/ControClient.Web
 dotnet user-secrets set "AzureAd:ClientId" "<client-id>" --project src/ControClient.Web
+dotnet user-secrets set "AzureAd:ClientSecret" "<valor-del-secreto>" --project src/ControClient.Web
 ```
 
 Y el primer administrador, para que el primer inicio de sesión no entre como lectura:
