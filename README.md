@@ -29,6 +29,23 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 
 Pendiente: Android (6), migración (7) y conectar el tenant real de Entra ID.
 
+## Modelo de acceso (importante)
+
+Esta es una herramienta **interna de Ideo Networks**:
+
+- **Usuarios**: solo empleados de la empresa, con cuenta en el tenant. No hay
+  registro propio, ni invitados, ni acceso de terceros.
+- **Clientes**: son los datos gestionados (empresas a las que se da servicio).
+  **No son cuentas y no inician sesión.** No existe portal de clientes.
+- **Permisos por cliente**: sirven para decidir qué empleado ve o edita qué
+  cliente, no para dar acceso al cliente.
+- **Verificaciones**: el token debe ser del tenant configurado (se rechaza
+  cualquier otro), y los endpoints exigen sesión salvo `/health`. El contrato
+  OpenAPI solo se publica a administradores.
+
+Consecuencia práctica en el portal: en **Aplicaciones empresariales → Propiedades**
+marca «¿Se requiere asignación?» y asigna únicamente el grupo del personal.
+
 ## Estructura
 
 ```

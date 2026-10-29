@@ -186,8 +186,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Orden explícito: autenticar, dar de alta al usuario y autorizar.
+// Orden explícito: autenticar, comprobar tenant, dar de alta al usuario, autorizar.
 app.UseAuthentication();
+app.UseMiddleware<ControClient.Web.Security.TenantGuardMiddleware>();
 app.UseMiddleware<ControClient.Web.Security.UserProvisioningMiddleware>();
 app.UseAuthorization();
 
@@ -200,7 +201,10 @@ app.MapFormEndpoints();
 app.MapDocumentEndpoints();
  app.MapVaultEndpoints();
 app.MapSearchEndpoints();
-app.MapOpenApi();
+
+// El contrato describe toda la superficie de la API: no se publica en abierto.
+// En desarrollo queda accesible con sesión de administrador.
+app.MapOpenApi().RequireAuthorization("AdminOnly");
 
 // Diagnóstico de claims: solo en desarrollo. Muestra tipos y valores enmascarados
 // para entender qué emite el tenant sin exponer datos sensibles completos.
