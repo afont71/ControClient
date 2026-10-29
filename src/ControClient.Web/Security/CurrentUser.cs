@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using ControClient.Domain.Users;
 
 namespace ControClient.Web.Security;
@@ -11,8 +11,13 @@ public sealed record CurrentUser(string ObjectId, string Name, AppRole Role, boo
         if (principal?.Identity?.IsAuthenticated != true)
             return null;
 
-        var objectId = principal.FindFirst("oid")?.Value
-                       ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // El identificador estable es el claim objectidentifier (oid, GUID). Con
+        // MapInboundClaims=false el nombre largo es el que llega; "sub" (nameidentifier)
+        // es un identificador por aplicación y no debe usarse si hay oid.
+        var objectId =
+            principal.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
+            ?? principal.FindFirst("oid")?.Value
+            ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrWhiteSpace(objectId))
             return null;
 
