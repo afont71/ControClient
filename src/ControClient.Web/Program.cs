@@ -1,3 +1,4 @@
+﻿using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
@@ -27,6 +28,21 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenApi();
+
+// Claves de protección de datos persistentes: si viven solo en memoria, cada
+// reinicio invalida cookies y el "state" del login (Unable to unprotect message.State).
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (string.IsNullOrWhiteSpace(keysPath))
+    keysPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ControClient", "dpkeys");
+else if (!Path.IsPathRooted(keysPath))
+    keysPath = Path.Combine(builder.Environment.ContentRootPath, keysPath);
+
+Directory.CreateDirectory(keysPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+    .SetApplicationName("ControClient");
 
 // La raíz del almacén documental se resuelve aquí. Por defecto va a datos locales
 // del usuario: nunca dentro del repositorio. En producción se configura absoluta.
