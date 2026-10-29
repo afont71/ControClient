@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
 using ControClient.Infrastructure;
@@ -209,6 +209,27 @@ app.MapGroupEndpoints();
 // El contrato describe toda la superficie de la API: no se publica en abierto.
 // En desarrollo queda accesible con sesión de administrador.
 app.MapOpenApi().RequireAuthorization("AdminOnly");
+
+// Cierre de sesión: borra la cookie y, con Entra, cierra también la sesión de
+// Microsoft para que no vuelva a entrar por SSO inmediatamente.
+app.MapGet("/logout", async (HttpContext httpContext, IConfiguration config) =>
+{
+    var devMode = (config["Authentication:Mode"] ?? "").Equals("Development", StringComparison.OrdinalIgnoreCase);
+
+    if (!devMode)
+    {
+        await httpContext.SignOutAsync(
+            Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme);
+
+        await httpContext.SignOutAsync(
+            Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectDefaults.AuthenticationScheme,
+            new Microsoft.AspNetCore.Authentication.AuthenticationProperties { RedirectUri = "/logged-out" });
+
+        return Results.Empty;
+    }
+
+    return Results.Redirect("/logged-out");
+}).RequireAuthorization();
 
 // Diagnóstico de claims: solo en desarrollo. Muestra tipos y valores enmascarados
 // para entender qué emite el tenant sin exponer datos sensibles completos.
