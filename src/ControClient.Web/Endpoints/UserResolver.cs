@@ -17,7 +17,7 @@ public static class UserResolver
         if (current is null)
             return null;
 
-        var user = await provisioner.GetOrCreateAsync(current.ObjectId, current.Name, null, ct);
+        var user = await provisioner.GetOrCreateAsync(current.ObjectId, current.Name, current.Email, ct);
         return user.IsActive ? user : null;
     }
 }

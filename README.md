@@ -22,12 +22,13 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Pantallas de bóveda (estado y credenciales por cliente) | ✅ |
 | Búsqueda global filtrada por alcance (sin secretos) | ✅ |
 | Usuarios: rol, activar/desactivar, grupos | ✅ |
+| Pre-registro por correo antes del primer acceso | ✅ |
 | Grupos: miembros y clientes con permisos, asignación masiva | ✅ |
 | Auditoría visible con filtros | ✅ |
 | Contrato OpenAPI en `/openapi/v1.json` | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
 | Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda, búsqueda y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 54 |
+| Pruebas automatizadas | ✅ 57 |
 | CI (build + test) | ✅ |
 
 Conectado el tenant real (login + MFA por política). Pendiente: Android (6) y migración (7).

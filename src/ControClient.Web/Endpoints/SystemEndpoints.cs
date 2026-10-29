@@ -113,6 +113,55 @@ public static class SystemEndpoints
             return Results.Ok(users);
         }).RequireAuthorization();
 
+        // Pre-registro por correo: crea la ficha antes del primer acceso para poder
+        // preparar rol, grupos y clientes. Al entrar, se vincula por UPN.
+        app.MapPost("/api/v1/users", async (
+            PreRegisterUserRequest request,
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            AppDbContext db,
+            IAuditWriter audit,
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
+        {
+            var actor = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (actor is null)
+                return Results.Unauthorized();
+
+            if (!actor.IsIn(AppRole.Administrator))
+                return Results.Forbid();
+
+            if (string.IsNullOrWhiteSpace(request.Email) || !request.Email.Contains('@'))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["email"] = ["Correo válido obligatorio."]
+                });
+
+            var email = request.Email.Trim().ToLowerInvariant();
+            if (await db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == email, ct))
+                return Results.Conflict(new { error = "Ya existe un usuario con ese correo." });
+
+            if (!Enum.TryParse<AppRole>(request.Role, ignoreCase: true, out var role))
+                role = AppRole.ReadOnly;
+
+            var displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? email : request.DisplayName.Trim();
+            var entity = new AppUser("pending:" + email, displayName, email, role);
+
+            db.Users.Add(entity);
+            await db.SaveChangesAsync(ct);
+
+            await audit.WriteAsync(new AuditEvent(
+                entity: "users",
+                action: "users.pre_register",
+                actorName: actor.DisplayName,
+                actorObjectId: actor.EntraObjectId,
+                correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
+                reason: $"usuario={email} rol={role}"), ct);
+
+            return Results.Created($"/api/v1/users/{entity.Id}",
+                new { entity.Id, entity.DisplayName, entity.Email, Role = entity.Role.ToString(), Pending = true });
+        }).RequireAuthorization();
+
         // Cambio de rol: solo administración y queda auditado (PRM-13, PRM-15: no autoaprobación).
         app.MapPatch("/api/v1/users/{id:guid}/role", async (
             Guid id,
@@ -207,6 +256,7 @@ public static class SystemEndpoints
 
     public sealed record ChangeRoleRequest(string Role);
     public sealed record ChangeActiveRequest(bool Active);
+    public sealed record PreRegisterUserRequest(string Email, string? DisplayName, string? Role);
 
     private static string AppVersion() =>
         Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";

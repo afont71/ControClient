@@ -45,6 +45,20 @@ public sealed class AppUser
     public void Deactivate() => IsActive = false;
 
     public void Activate() => IsActive = true;
+
+    /// <summary>
+    /// Vincula una ficha pre-registrada con la identidad real de Entra en el primer
+    /// acceso. El identificador provisional es <c>pending:correo</c>.
+    /// </summary>
+    public void LinkEntraIdentity(string entraObjectId)
+    {
+        if (string.IsNullOrWhiteSpace(entraObjectId))
+            throw new ArgumentException("El identificador de Entra es obligatorio.", nameof(entraObjectId));
+
+        EntraObjectId = entraObjectId.Trim();
+    }
+
+    public bool IsPending => EntraObjectId.StartsWith("pending:", StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>Roles de §3.2. Un usuario puede necesitar varios; en v1 se usa el principal.</summary>

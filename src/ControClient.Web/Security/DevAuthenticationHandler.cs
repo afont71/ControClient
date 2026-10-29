@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -30,6 +30,7 @@ public sealed class DevAuthenticationHandler(
         var name = Header("X-Dev-Name")
                    ?? configuration["Authentication:Dev:Name"]
                    ?? "Administrador de desarrollo";
+        var email = Header("X-Dev-Email") ?? configuration["Authentication:Dev:Email"];
         var role = Header("X-Dev-Role")
                    ?? configuration["Authentication:Dev:Role"]
                    ?? "Administrator";
@@ -43,6 +44,9 @@ public sealed class DevAuthenticationHandler(
             new("amr", "mfa"),
             new("http://schemas.microsoft.com/identity/claims/objectidentifier", objectId)
         };
+
+        if (!string.IsNullOrWhiteSpace(email))
+            claims.Add(new Claim("preferred_username", email));
 
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);

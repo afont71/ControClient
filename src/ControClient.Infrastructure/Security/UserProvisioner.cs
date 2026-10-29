@@ -1,4 +1,4 @@
-﻿using ControClient.Domain.Abstractions;
+using ControClient.Domain.Abstractions;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -7,9 +7,10 @@ using Microsoft.Extensions.Configuration;
 namespace ControClient.Infrastructure.Security;
 
 /// <summary>
-/// Crea el usuario en el primer inicio de sesión. El primer administrador se
-/// define por configuración (Authentication:BootstrapAdminObjectId); el resto
-/// entra como solo lectura hasta que se le asigne rol (denegación por defecto).
+/// Alta del usuario en el primer inicio de sesión. Si existe una ficha
+/// pre-registrada por correo (<c>pending:correo</c>), se vincula con la identidad
+/// real y conserva el rol y los permisos ya preparados. El primer administrador
+/// se define por configuración.
 /// </summary>
 public sealed class UserProvisioner(AppDbContext db, IConfiguration configuration) : IUserProvisioner
 {
@@ -20,6 +21,24 @@ public sealed class UserProvisioner(AppDbContext db, IConfiguration configuratio
         CancellationToken ct = default)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.EntraObjectId == objectId, ct);
+
+        if (user is null && !string.IsNullOrWhiteSpace(email))
+        {
+            // Ficha preparada por un administrador antes del primer acceso.
+            var normalized = email.Trim().ToLowerInvariant();
+            var pending = await db.Users.FirstOrDefaultAsync(
+                u => u.EntraObjectId.ToLower() == "pending:" + normalized, ct);
+
+            if (pending is not null)
+            {
+                pending.LinkEntraIdentity(objectId);
+                pending.UpdateProfile(displayName, email);
+                pending.Activate();
+                pending.RegisterLogin();
+                await db.SaveChangesAsync(ct);
+                return pending;
+            }
+        }
 
         if (user is null)
         {

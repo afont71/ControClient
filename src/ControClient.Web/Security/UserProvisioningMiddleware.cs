@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Web.Security;
 
 namespace ControClient.Web.Security;
@@ -19,7 +19,7 @@ public sealed class UserProvisioningMiddleware(RequestDelegate next)
             {
                 try
                 {
-                    await provisioner.GetOrCreateAsync(current.ObjectId, current.Name, null);
+                    await provisioner.GetOrCreateAsync(current.ObjectId, current.Name, current.Email);
                 }
                 catch (Exception ex)
                 {

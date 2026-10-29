@@ -4,7 +4,7 @@ using ControClient.Domain.Users;
 namespace ControClient.Web.Security;
 
 /// <summary>Vista mínima del usuario autenticado para endpoints y componentes.</summary>
-public sealed record CurrentUser(string ObjectId, string Name, AppRole Role, bool MfaSatisfied)
+public sealed record CurrentUser(string ObjectId, string Name, string? Email, AppRole Role, bool MfaSatisfied)
 {
     public static CurrentUser? FromPrincipal(ClaimsPrincipal? principal)
     {
@@ -25,6 +25,12 @@ public sealed record CurrentUser(string ObjectId, string Name, AppRole Role, boo
                    ?? principal.FindFirst("name")?.Value
                    ?? objectId;
 
+        // UPN del usuario: se usa para vincular fichas pre-registradas por correo.
+        var email = principal.FindFirst("preferred_username")?.Value
+                    ?? principal.FindFirst(ClaimTypes.Email)?.Value
+                    ?? principal.FindFirst("email")?.Value
+                    ?? principal.FindFirst("upn")?.Value;
+
         var roleClaim = principal.FindFirst(ClaimTypes.Role)?.Value
                         ?? principal.FindFirst("roles")?.Value;
 
@@ -35,7 +41,7 @@ public sealed record CurrentUser(string ObjectId, string Name, AppRole Role, boo
         var mfa = principal.FindAll("amr").Any(c => c.Value.Contains("mfa", StringComparison.OrdinalIgnoreCase))
                   || principal.FindAll("acrs").Any(c => c.Value.Contains("mfa", StringComparison.OrdinalIgnoreCase));
 
-        return new CurrentUser(objectId, name, role, mfa);
+        return new CurrentUser(objectId, name, email, role, mfa);
     }
 
     public bool IsIn(params AppRole[] roles) => Array.IndexOf(roles, Role) >= 0;

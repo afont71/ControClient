@@ -11,7 +11,34 @@ namespace ControClient.Web.Pages;
 /// <summary>Gestión de usuarios para administración: rol, estado y grupos.</summary>
 public sealed class UsersPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
-    public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, DateTimeOffset? LastLogin, string Groups);
+    public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, DateTimeOffset? LastLogin, string Groups, bool Pending);
+
+    public async Task<(Guid? Id, string? Error)> PreRegisterAsync(string email, string? displayName, string role)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (actor, db) = await ResolveAsync(sp);
+        if (actor is null || !actor.IsIn(AppRole.Administrator))
+            return (null, "Solo un administrador puede pre-registrar usuarios.");
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+            return (null, "Correo válido obligatorio.");
+
+        var normalized = email.Trim().ToLowerInvariant();
+        if (await db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == normalized))
+            return (null, "Ya existe un usuario con ese correo.");
+
+        if (!Enum.TryParse<AppRole>(role, ignoreCase: true, out var parsed))
+            parsed = AppRole.ReadOnly;
+
+        var name = string.IsNullOrWhiteSpace(displayName) ? normalized : displayName.Trim();
+        var entity = new AppUser("pending:" + normalized, name, normalized, parsed);
+        db.Users.Add(entity);
+        await db.SaveChangesAsync();
+
+        await AuditAsync(sp, actor, "users.pre_register", $"usuario={normalized} rol={parsed}");
+        return (entity.Id, null);
+    }
 
     public async Task<IReadOnlyList<UserRow>?> ListAsync()
     {
@@ -36,7 +63,8 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
             u.Role.ToString(),
             u.IsActive,
             u.LastLoginAt,
-            string.Join(", ", memberships.Where(m => m.UserId == u.Id).Select(m => m.GroupName))
+            string.Join(", ", memberships.Where(m => m.UserId == u.Id).Select(m => m.GroupName)),
+            u.IsPending
         )).ToList();
     }
 

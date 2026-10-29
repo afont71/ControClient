@@ -17,6 +17,33 @@
 {
     <p class="muted">Solo un administrador puede gestionar usuarios.</p>
 }
+else
+{
+    <section class="panel">
+        <h2>Pre-registrar usuario</h2>
+        <p class="muted">
+            Crea la ficha antes de que la persona entre, para dejar preparados su rol y sus grupos.
+            Al iniciar sesión, se vincula con su cuenta por el correo.
+        </p>
+        <p>
+            <label>Correo<br /><input @bind="_newEmail" placeholder="nombre@ideonetworks.com" /></label>
+            <label>Nombre<br /><input @bind="_newName" /></label>
+            <label>Rol<br />
+                <select @bind="_newRole">
+                    @foreach (var role in Enum.GetNames<AppRole>())
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </select>
+            </label>
+            <button @onclick="PreRegisterAsync" disabled="@_busy">Pre-registrar</button>
+        </p>
+    </section>
+}
+
+@if (_users is null)
+{
+}
 else if (_users.Count == 0)
 {
     <p>Sin usuarios.</p>
@@ -31,7 +58,13 @@ else
             @foreach (var u in _users)
             {
                 <tr class="@(u.IsActive ? "" : "inactive")">
-                    <td>@u.Name</td>
+                    <td>
+                        @u.Name
+                        @if (u.Pending)
+                        {
+                            <span class="badge">pendiente</span>
+                        }
+                    </td>
                     <td>@(u.Email ?? "—")</td>
                     <td>
                         <select value="@u.Role" @onchange="e => SetRoleAsync(u.Id, e.Value?.ToString())">
@@ -58,10 +91,36 @@ else
     private IReadOnlyList<UsersPageService.UserRow>? _users;
     private string? _message;
     private bool _isError;
+    private string? _newEmail;
+    private string? _newName;
+    private string _newRole = nameof(AppRole.ReadOnly);
+    private bool _busy;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync() => _users = await Servicio.ListAsync();
+
+    private async Task PreRegisterAsync()
+    {
+        _busy = true;
+        try
+        {
+            var (id, error) = await Servicio.PreRegisterAsync(_newEmail ?? string.Empty, _newName, _newRole);
+            if (id is null)
+            {
+                SetMessage(error ?? "No se pudo pre-registrar.", true);
+                return;
+            }
+
+            SetMessage("Usuario pre-registrado. Entrará con ese correo y conservará rol y grupos.", false);
+            _newEmail = _newName = null;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 
     private async Task SetRoleAsync(Guid userId, string? role)
     {
@@ -90,6 +149,8 @@ else
     th, td { border-bottom: 1px solid #E1E7EF; padding: .45rem; text-align: left; }
     select { padding: .3rem; }
     .inactive { color: #9CA3AF; }
+    .badge { background: #FFF3CD; border-radius: 6px; padding: .05rem .4rem; font-size: .8rem; }
+    .panel { border: 1px solid #E1E7EF; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
     .muted { color: #4B5563; }
     .error { color: #B00020; }
     .ok { color: #1B5E20; }
