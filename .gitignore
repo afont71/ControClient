@@ -12,3 +12,8 @@ appsettings.*.local.json
 .env
 .DS_Store
 Thumbs.db
+
+# Almacen de documentos en tiempo de ejecucion
+storage/
+**/storage/
+

@@ -25,10 +25,13 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
-// La raíz del almacén documental se resuelve aquí para admitir rutas relativas.
+// La raíz del almacén documental se resuelve aquí. Por defecto va a datos locales
+// del usuario: nunca dentro del repositorio. En producción se configura absoluta.
 var documentsRoot = builder.Configuration["Storage:DocumentsRoot"];
 if (string.IsNullOrWhiteSpace(documentsRoot))
-    documentsRoot = Path.Combine(builder.Environment.ContentRootPath, "storage", "documents");
+    documentsRoot = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ControClient", "documents");
 else if (!Path.IsPathRooted(documentsRoot))
     documentsRoot = Path.Combine(builder.Environment.ContentRootPath, documentsRoot);
 builder.Configuration["Storage:DocumentsRoot"] = documentsRoot;
