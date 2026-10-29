@@ -38,6 +38,13 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 
 Conectado el tenant real (login + MFA por política). Pendiente: Android (6) y migración (7).
 
+## Operación
+
+- [Producción](docs/produccion.md): servicio de Windows, permisos, red y pendientes.
+- scripts/backup.ps1: copia de base de datos, documentos, claves y bóveda.
+- scripts/restore-test.ps1: prueba de restauración real en clúster temporal.
+- scripts/install-service.ps1: publica e instala el servicio (consola elevada).
+
 ## Modelo de acceso (importante)
 
 Esta es una herramienta **interna de Ideo Networks**:
