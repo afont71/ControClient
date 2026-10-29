@@ -43,6 +43,8 @@ public sealed class AppUser
     public void ChangeRole(AppRole role) => Role = role;
 
     public void Deactivate() => IsActive = false;
+
+    public void Activate() => IsActive = true;
 }
 
 /// <summary>Roles de §3.2. Un usuario puede necesitar varios; en v1 se usa el principal.</summary>

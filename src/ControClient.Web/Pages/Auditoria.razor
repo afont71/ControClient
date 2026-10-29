@@ -1,0 +1,74 @@
+﻿@page "/auditoria"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject AuditPageService Servicio
+
+<PageTitle>Auditoría</PageTitle>
+
+<h1>Auditoría</h1>
+
+<p>
+    <label>Acción<br /><input @bind="_action" placeholder="p. ej. vault" /></label>
+    <label>Actor<br /><input @bind="_actor" placeholder="nombre" /></label>
+    <button @onclick="LoadAsync" disabled="@_loading">Buscar</button>
+</p>
+
+@if (_events is null)
+{
+    <p class="muted">No tienes permiso para ver la auditoría.</p>
+}
+else if (_events.Count == 0)
+{
+    <p>Sin eventos para ese filtro.</p>
+}
+else
+{
+    <table>
+        <thead><tr><th>Fecha</th><th>Actor</th><th>Entidad</th><th>Acción</th><th>Resultado</th><th>Motivo</th></tr></thead>
+        <tbody>
+            @foreach (var e in _events)
+            {
+                <tr>
+                    <td>@e.At.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</td>
+                    <td>@e.Actor</td>
+                    <td>@e.Entity</td>
+                    <td>@e.Action</td>
+                    <td class="@(e.Result == "ok" ? "" : "error")">@e.Result</td>
+                    <td class="reason">@e.Reason</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <p class="muted">Mostrando @_events.Count eventos (máximo 500).</p>
+}
+
+@code {
+    private IReadOnlyList<AuditPageService.EventRow>? _events;
+    private string? _action;
+    private string? _actor;
+    private bool _loading;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _events = await Servicio.ListAsync(_action, _actor);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}
+
+<style>
+    table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .4rem; text-align: left; vertical-align: top; }
+    .reason { color: #4B5563; max-width: 24rem; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    input { padding: .35rem; }
+</style>

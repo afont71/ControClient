@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
 using ControClient.Infrastructure;
@@ -45,6 +45,9 @@ builder.Services.AddScoped<ControClient.Web.Pages.FormPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.DocumentPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.VaultPageService>();
 builder.Services.AddScoped<ControClient.Web.Pages.SearchPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.UsersPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.GroupsPageService>();
+builder.Services.AddScoped<ControClient.Web.Pages.AuditPageService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
@@ -201,6 +204,7 @@ app.MapFormEndpoints();
 app.MapDocumentEndpoints();
  app.MapVaultEndpoints();
 app.MapSearchEndpoints();
+app.MapGroupEndpoints();
 
 // El contrato describe toda la superficie de la API: no se publica en abierto.
 // En desarrollo queda accesible con sesión de administrador.

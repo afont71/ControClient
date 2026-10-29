@@ -398,6 +398,124 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("record_instances", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Groups.Group", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_groups_name");
+
+                    b.ToTable("groups", (string)null);
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Groups.GroupGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Actions")
+                        .HasColumnType("integer")
+                        .HasColumnName("actions");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<string>("GrantedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("granted_by");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("GroupId", "ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_group_grants_group_client");
+
+                    b.ToTable("group_grants", (string)null);
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Groups.GroupMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AddedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_at");
+
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("added_by");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GroupId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_group_members_group_user");
+
+                    b.ToTable("group_members", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Users.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -688,6 +806,40 @@ namespace ControClient.Infrastructure.Migrations
                         .HasConstraintName("fk_record_instances_template");
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Groups.GroupGrant", b =>
+                {
+                    b.HasOne("ControClient.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_grants_client");
+
+                    b.HasOne("ControClient.Domain.Groups.Group", null)
+                        .WithMany("Grants")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_grants_group");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Groups.GroupMember", b =>
+                {
+                    b.HasOne("ControClient.Domain.Groups.Group", null)
+                        .WithMany("Members")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_members_group");
+
+                    b.HasOne("ControClient.Domain.Users.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_members_user");
+                });
+
             modelBuilder.Entity("ControClient.Domain.Vault.VaultItem", b =>
                 {
                     b.HasOne("ControClient.Domain.Clients.Client", null)
@@ -711,6 +863,13 @@ namespace ControClient.Infrastructure.Migrations
             modelBuilder.Entity("ControClient.Domain.Documents.Document", b =>
                 {
                     b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Groups.Group", b =>
+                {
+                    b.Navigation("Grants");
+
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("ControClient.Domain.Vault.VaultItem", b =>

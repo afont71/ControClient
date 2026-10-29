@@ -1,0 +1,273 @@
+﻿@page "/grupos"
+@using Microsoft.AspNetCore.Authorization
+@using ControClient.Domain.Clients
+@attribute [Authorize]
+@inject GroupsPageService Servicio
+
+<PageTitle>Grupos</PageTitle>
+
+<h1>Grupos</h1>
+
+@if (_message is not null)
+{
+    <p class="@(_isError ? "error" : "ok")">@_message</p>
+}
+
+@if (_groups is null)
+{
+    <p class="muted">Solo un administrador puede gestionar grupos.</p>
+}
+else
+{
+    <section>
+        <h2>Nuevo grupo</h2>
+        <p>
+            <label>Nombre<br /><input @bind="_newName" /></label>
+            <label>Descripción<br /><input @bind="_newDescription" /></label>
+            <button @onclick="CreateAsync" disabled="@_busy">Crear grupo</button>
+        </p>
+    </section>
+
+    <section>
+        <h2>Grupos</h2>
+        @if (_groups.Count == 0)
+        {
+            <p>Sin grupos todavía.</p>
+        }
+        else
+        {
+            <table>
+                <thead><tr><th>Nombre</th><th>Descripción</th><th>Miembros</th><th>Clientes</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var g in _groups)
+                    {
+                        <tr class="@(g.Id == _selectedId ? "selected" : "")">
+                            <td>@g.Name</td>
+                            <td>@(g.Description ?? "—")</td>
+                            <td>@g.Members</td>
+                            <td>@g.Clients</td>
+                            <td><button @onclick="() => SelectAsync(g.Id)">Gestionar</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </section>
+
+    @if (_detail is not null)
+    {
+        <section class="panel">
+            <h2>@_detail.Name</h2>
+
+            <h3>Miembros</h3>
+            @if (_detail.Members.Count == 0)
+            {
+                <p>Sin miembros.</p>
+            }
+            else
+            {
+                <table>
+                    <thead><tr><th>Nombre</th><th>Correo</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var m in _detail.Members)
+                        {
+                            <tr>
+                                <td>@m.Name</td>
+                                <td>@(m.Email ?? "—")</td>
+                                <td><button @onclick="() => RemoveMemberAsync(m.UserId)">Quitar</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <p>
+                <select @bind="_memberToAdd">
+                    <option value="">Añadir miembro…</option>
+                    @foreach (var u in _users)
+                    {
+                        <option value="@u.Id">@u.Name</option>
+                    }
+                </select>
+                <button @onclick="AddMemberAsync" disabled="@_busy">Añadir</button>
+            </p>
+
+            <h3>Clientes asignados</h3>
+            @if (_detail.Grants.Count == 0)
+            {
+                <p>Sin clientes asignados.</p>
+            }
+            else
+            {
+                <table>
+                    <thead><tr><th>Cliente</th><th>Acciones</th><th></th></tr></thead>
+                    <tbody>
+                        @foreach (var g in _detail.Grants)
+                        {
+                            <tr>
+                                <td>@g.ClientName</td>
+                                <td>@FormatActions(g.Actions)</td>
+                                <td><button @onclick="() => RevokeClientAsync(g.ClientId)">Revocar</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <h3>Asignar clientes (masivo)</h3>
+            <div class="clients">
+                @foreach (var c in _clients)
+                {
+                    <label class="client">
+                        <input type="checkbox" checked="@_selectedClientIds.Contains(c.Id)"
+                               @onchange="e => ToggleClient(c.Id, e)" />
+                        @c.Name
+                    </label>
+                }
+            </div>
+
+            <p>
+                <label><input type="checkbox" @bind="_grantView" /> Ver</label>
+                <label><input type="checkbox" @bind="_grantEdit" /> Editar</label>
+                <label><input type="checkbox" @bind="_grantReveal" /> Revelar secretos</label>
+                <button @onclick="GrantAsync" disabled="@_busy">Asignar a los seleccionados</button>
+            </p>
+        </section>
+    }
+}
+
+@code {
+    private IReadOnlyList<GroupsPageService.GroupRow>? _groups;
+    private GroupsPageService.GroupDetail? _detail;
+    private IReadOnlyList<(Guid Id, string Name)> _users = [];
+    private IReadOnlyList<(Guid Id, string Name)> _clients = [];
+    private readonly HashSet<Guid> _selectedClientIds = [];
+    private Guid? _selectedId;
+    private string? _newName;
+    private string? _newDescription;
+    private string _memberToAdd = string.Empty;
+    private bool _grantView = true;
+    private bool _grantEdit;
+    private bool _grantReveal;
+    private string? _message;
+    private bool _isError;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _groups = await Servicio.ListAsync();
+        if (_groups is null)
+            return;
+
+        _users = await Servicio.UsersAsync();
+        _clients = await Servicio.ClientsAsync();
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        try
+        {
+            var (id, error) = await Servicio.CreateAsync(_newName ?? string.Empty, _newDescription);
+            if (id is null)
+            {
+                SetMessage(error ?? "No se pudo crear.", true);
+                return;
+            }
+
+            _newName = _newDescription = null;
+            SetMessage("Grupo creado.", false);
+            await LoadAsync();
+            await SelectAsync(id.Value);
+        }
+        finally { _busy = false; }
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        _selectedId = id;
+        _detail = await Servicio.DetailAsync(id);
+    }
+
+    private async Task AddMemberAsync()
+    {
+        if (_detail is null || !Guid.TryParse(_memberToAdd, out var userId))
+        {
+            SetMessage("Selecciona un usuario.", true);
+            return;
+        }
+
+        var (ok, error) = await Servicio.AddMemberAsync(_detail.Id, userId);
+        SetMessage(ok ? "Miembro añadido." : error ?? "No se pudo añadir.", !ok);
+        _memberToAdd = string.Empty;
+        await SelectAsync(_detail.Id);
+    }
+
+    private async Task RemoveMemberAsync(Guid userId)
+    {
+        if (_detail is null) return;
+        var (ok, error) = await Servicio.RemoveMemberAsync(_detail.Id, userId);
+        SetMessage(ok ? "Miembro quitado." : error ?? "No se pudo quitar.", !ok);
+        await SelectAsync(_detail.Id);
+    }
+
+    private void ToggleClient(Guid clientId, ChangeEventArgs args)
+    {
+        if (args.Value is bool on && on) _selectedClientIds.Add(clientId);
+        else _selectedClientIds.Remove(clientId);
+    }
+
+    private async Task GrantAsync()
+    {
+        if (_detail is null) return;
+
+        var actions = GrantActions.None;
+        if (_grantView) actions |= GrantActions.View;
+        if (_grantEdit) actions |= GrantActions.Edit;
+        if (_grantReveal) actions |= GrantActions.RevealSecret;
+
+        var (updated, error) = await Servicio.GrantClientsAsync(_detail.Id, _selectedClientIds.ToList(), actions);
+        SetMessage(error is null ? $"{updated} cliente(s) asignados." : error, error is not null);
+        if (error is null) _selectedClientIds.Clear();
+        await SelectAsync(_detail.Id);
+    }
+
+    private async Task RevokeClientAsync(Guid clientId)
+    {
+        if (_detail is null) return;
+        var (ok, error) = await Servicio.RevokeClientAsync(_detail.Id, clientId);
+        SetMessage(ok ? "Cliente revocado." : error ?? "No se pudo revocar.", !ok);
+        await SelectAsync(_detail.Id);
+    }
+
+    private static string FormatActions(int actions)
+    {
+        var value = (GrantActions)actions;
+        var parts = new List<string>();
+        if ((value & GrantActions.View) != 0) parts.Add("Ver");
+        if ((value & GrantActions.Edit) != 0) parts.Add("Editar");
+        if ((value & GrantActions.RevealSecret) != 0) parts.Add("Revelar");
+        return parts.Count == 0 ? "—" : string.Join(", ", parts);
+    }
+
+    private void SetMessage(string text, bool error)
+    {
+        _message = text;
+        _isError = error;
+    }
+}
+
+<style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #E1E7EF; padding: .45rem; text-align: left; }
+    .selected { background: #F2F4F8; }
+    .panel { border: 1px solid #E1E7EF; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; }
+    .clients { display: flex; flex-wrap: wrap; gap: .5rem 1rem; max-height: 14rem; overflow: auto; }
+    .client { white-space: nowrap; }
+    .muted { color: #4B5563; }
+    .error { color: #B00020; }
+    .ok { color: #1B5E20; }
+    input:not([type=checkbox]), select { padding: .35rem; }
+</style>

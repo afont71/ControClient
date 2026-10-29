@@ -160,10 +160,53 @@ public static class SystemEndpoints
             return Results.Ok(new { target.Id, Role = target.Role.ToString() });
         }).RequireAuthorization();
 
+        // Activar o desactivar un usuario. Desactivar revoca de inmediato el acceso
+        // (el servicio de acceso comprueba IsActive en cada petición).
+        app.MapPatch("/api/v1/users/{id:guid}/active", async (
+            Guid id,
+            ChangeActiveRequest request,
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            AppDbContext db,
+            IAuditWriter audit,
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
+        {
+            var actor = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (actor is null)
+                return Results.Unauthorized();
+
+            if (!actor.IsIn(AppRole.Administrator))
+                return Results.Forbid();
+
+            if (id == actor.Id)
+                return Results.Conflict(new { error = "No puedes desactivar tu propia cuenta." });
+
+            var target = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+            if (target is null)
+                return Results.NotFound();
+
+            if (!request.Active)
+                target.Deactivate();
+
+            await db.SaveChangesAsync(ct);
+
+            await audit.WriteAsync(new AuditEvent(
+                entity: "users",
+                action: request.Active ? "users.activate" : "users.deactivate",
+                actorName: actor.DisplayName,
+                actorObjectId: actor.EntraObjectId,
+                correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
+                reason: $"usuario={target.EntraObjectId}"), ct);
+
+            return Results.Ok(new { target.Id, target.IsActive });
+        }).RequireAuthorization();
+
         return app;
     }
 
     public sealed record ChangeRoleRequest(string Role);
+    public sealed record ChangeActiveRequest(bool Active);
 
     private static string AppVersion() =>
         Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "0.0.0";

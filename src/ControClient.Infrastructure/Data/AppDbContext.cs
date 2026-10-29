@@ -2,6 +2,7 @@ using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Documents;
 using ControClient.Domain.Forms;
+using ControClient.Domain.Groups;
 using ControClient.Domain.Users;
 using ControClient.Domain.Vault;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<ClientGrant> Grants => Set<ClientGrant>();
+    public DbSet<Group> Groups => Set<Group>();
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+    public DbSet<GroupGrant> GroupGrants => Set<GroupGrant>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<Document> Documents => Set<Document>();
@@ -91,6 +95,54 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => x.ActorObjectId).HasDatabaseName("ix_audit_events_actor");
             e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
                 .OnDelete(DeleteBehavior.Restrict).HasConstraintName("fk_audit_events_client");
+        });
+
+        modelBuilder.Entity<Group>(e =>
+        {
+            e.ToTable("groups");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+            e.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ux_groups_name");
+
+            e.HasMany(x => x.Members).WithOne().HasForeignKey(m => m.GroupId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_members_group");
+            e.HasMany(x => x.Grants).WithOne().HasForeignKey(g => g.GroupId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_grants_group");
+        });
+
+        modelBuilder.Entity<GroupMember>(e =>
+        {
+            e.ToTable("group_members");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.GroupId).HasColumnName("group_id");
+            e.Property(x => x.UserId).HasColumnName("user_id");
+            e.Property(x => x.AddedAt).HasColumnName("added_at");
+            e.Property(x => x.AddedBy).HasColumnName("added_by").HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique().HasDatabaseName("ux_group_members_group_user");
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_members_user");
+        });
+
+        modelBuilder.Entity<GroupGrant>(e =>
+        {
+            e.ToTable("group_grants");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.GroupId).HasColumnName("group_id");
+            e.Property(x => x.ClientId).HasColumnName("client_id");
+            e.Property(x => x.Actions).HasColumnName("actions").HasConversion<int>();
+            e.Property(x => x.GrantedAt).HasColumnName("granted_at");
+            e.Property(x => x.ExpiresAt).HasColumnName("expires_at");
+            e.Property(x => x.GrantedBy).HasColumnName("granted_by").HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.GroupId, x.ClientId }).IsUnique().HasDatabaseName("ux_group_grants_group_client");
+            e.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_grants_client");
         });
 
         modelBuilder.Entity<FormTemplate>(e =>

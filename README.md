@@ -1,4 +1,4 @@
-# ControClient
+﻿# ControClient
 
 Aplicación interna de gestión de clientes IT y bóveda de credenciales para **Ideo Networks SL**.
 
@@ -21,13 +21,16 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Cifrado por envoltura (DEK por secreto) y clave protegida con DPAPI | ✅ |
 | Pantallas de bóveda (estado y credenciales por cliente) | ✅ |
 | Búsqueda global filtrada por alcance (sin secretos) | ✅ |
+| Usuarios: rol, activar/desactivar, grupos | ✅ |
+| Grupos: miembros y clientes con permisos, asignación masiva | ✅ |
+| Auditoría visible con filtros | ✅ |
 | Contrato OpenAPI en `/openapi/v1.json` | ✅ |
 | Auditoría funcional con redacción de secretos | ✅ |
 | Endpoints de salud, sistema, clientes, usuarios, plantillas, fichas, documentos, bóveda, búsqueda y auditoría | ✅ |
-| Pruebas automatizadas | ✅ 49 |
+| Pruebas automatizadas | ✅ 54 |
 | CI (build + test) | ✅ |
 
-Pendiente: Android (6), migración (7) y conectar el tenant real de Entra ID.
+Conectado el tenant real (login + MFA por política). Pendiente: Android (6) y migración (7).
 
 ## Modelo de acceso (importante)
 

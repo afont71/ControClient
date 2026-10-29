@@ -1,4 +1,4 @@
-﻿using ControClient.Domain.Abstractions;
+using ControClient.Domain.Abstractions;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Security;
 using ControClient.Domain.Users;
@@ -8,8 +8,9 @@ using Microsoft.EntityFrameworkCore;
 namespace ControClient.Infrastructure.Security;
 
 /// <summary>
-/// Implementa el alcance real: rol + concesiones vigentes en base de datos.
+/// Implementa el alcance real: rol + concesiones directas + concesiones de grupo.
 /// Todo se resuelve en servidor; nunca se confía en el cliente (AC-05).
+/// El acceso efectivo es la unión (OR) de todas las concesiones vigentes.
 /// </summary>
 public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy policy) : IClientAccessService
 {
@@ -19,16 +20,23 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
             return null; // todos
 
         var now = DateTimeOffset.UtcNow;
-        var ids = await db.Grants
-            .AsNoTracking()
+
+        var direct = db.Grants.AsNoTracking()
             .Where(g => g.UserId == user.Id
                         && (g.ExpiresAt == null || g.ExpiresAt > now)
                         && (g.Actions & GrantActions.View) == GrantActions.View)
-            .Select(g => g.ClientId)
-            .Distinct()
-            .ToListAsync(ct);
+            .Select(g => g.ClientId);
 
-        return ids;
+        var viaGroups = from m in db.GroupMembers.AsNoTracking()
+                        join g in db.Groups.AsNoTracking() on m.GroupId equals g.Id
+                        join gg in db.GroupGrants.AsNoTracking() on m.GroupId equals gg.GroupId
+                        where m.UserId == user.Id
+                              && g.IsActive
+                              && (gg.ExpiresAt == null || gg.ExpiresAt > now)
+                              && (gg.Actions & GrantActions.View) == GrantActions.View
+                        select gg.ClientId;
+
+        return await direct.Concat(viaGroups).Distinct().ToListAsync(ct);
     }
 
     public async Task<bool> CanViewAsync(AppUser user, Guid clientId, CancellationToken ct = default)
@@ -39,8 +47,8 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         if (policy.CanViewAnyClient(user))
             return true;
 
-        var actions = await GetActionsAsync(user.Id, clientId, ct);
-        return actions.HasValue && (actions.Value & GrantActions.View) == GrantActions.View;
+        var actions = await GetEffectiveActionsAsync(user.Id, clientId, ct);
+        return (actions & GrantActions.View) == GrantActions.View;
     }
 
     public async Task<bool> CanEditAsync(AppUser user, Guid clientId, CancellationToken ct = default)
@@ -51,8 +59,8 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         if (policy.CanEditAnyClient(user))
             return true;
 
-        var actions = await GetActionsAsync(user.Id, clientId, ct);
-        return actions.HasValue && (actions.Value & GrantActions.Edit) == GrantActions.Edit;
+        var actions = await GetEffectiveActionsAsync(user.Id, clientId, ct);
+        return (actions & GrantActions.Edit) == GrantActions.Edit;
     }
 
     public async Task<bool> CanRevealAsync(AppUser user, Guid clientId, CancellationToken ct = default)
@@ -60,20 +68,33 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         if (!policy.CanRevealSecretsByRole(user))
             return false;
 
-        var actions = await GetActionsAsync(user.Id, clientId, ct);
-        return actions.HasValue && (actions.Value & GrantActions.RevealSecret) == GrantActions.RevealSecret;
+        var actions = await GetEffectiveActionsAsync(user.Id, clientId, ct);
+        return (actions & GrantActions.RevealSecret) == GrantActions.RevealSecret;
     }
 
-    private async Task<GrantActions?> GetActionsAsync(Guid userId, Guid clientId, CancellationToken ct)
+    /// <summary>Unión de concesiones directas vigentes y de grupo (grupo activo).</summary>
+    private async Task<GrantActions> GetEffectiveActionsAsync(Guid userId, Guid clientId, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        var grant = await db.Grants
-            .AsNoTracking()
-            .FirstOrDefaultAsync(g => g.UserId == userId && g.ClientId == clientId, ct);
 
-        if (grant is null || !grant.IsActive(now))
-            return null;
+        var direct = await db.Grants.AsNoTracking()
+            .Where(g => g.UserId == userId && g.ClientId == clientId
+                        && (g.ExpiresAt == null || g.ExpiresAt > now))
+            .Select(g => (int)g.Actions)
+            .ToListAsync(ct);
 
-        return grant.Actions;
+        var viaGroups = await (
+            from m in db.GroupMembers.AsNoTracking()
+            join g in db.Groups.AsNoTracking() on m.GroupId equals g.Id
+            join gg in db.GroupGrants.AsNoTracking() on m.GroupId equals gg.GroupId
+            where m.UserId == userId && gg.ClientId == clientId && g.IsActive
+                  && (gg.ExpiresAt == null || gg.ExpiresAt > now)
+            select (int)gg.Actions).ToListAsync(ct);
+
+        var actions = GrantActions.None;
+        foreach (var value in direct.Concat(viaGroups))
+            actions |= (GrantActions)value;
+
+        return actions;
     }
 }
