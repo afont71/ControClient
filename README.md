@@ -23,6 +23,7 @@ Este repositorio implementa la especificación `docs/especificacion/ESPECIFICACI
 | Búsqueda global filtrada por alcance (sin secretos) | ✅ |
 | Usuarios: rol, activar/desactivar, grupos | ✅ |
 | Pre-registro por correo antes del primer acceso | ✅ |
+| Eliminar fichas pendientes; desactivar usuarios reales | ✅ |
 | Grupos: miembros y clientes con permisos, asignación masiva | ✅ |
 | Auditoría visible con filtros | ✅ |
 | Contrato OpenAPI en `/openapi/v1.json` | ✅ |

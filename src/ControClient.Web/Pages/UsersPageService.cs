@@ -68,6 +68,28 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         )).ToList();
     }
 
+    public async Task<(bool Ok, string? Error)> DeletePendingAsync(Guid userId)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (actor, db) = await ResolveAsync(sp);
+        if (actor is null || !actor.IsIn(AppRole.Administrator))
+            return (false, "Solo un administrador puede eliminar fichas.");
+
+        var target = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (target is null)
+            return (true, null);
+
+        if (!target.IsPending)
+            return (false, "Solo se pueden eliminar fichas pendientes. Para un usuario real, desactívalo.");
+
+        var email = target.Email;
+        db.Users.Remove(target);
+        await db.SaveChangesAsync();
+        await AuditAsync(sp, actor, "users.delete_pending", $"usuario={email}");
+        return (true, null);
+    }
+
     public async Task<(bool Ok, string? Error)> SetRoleAsync(Guid userId, string role)
     {
         using var scope = scopes.CreateScope();

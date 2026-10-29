@@ -1,4 +1,4 @@
-﻿@page "/usuarios"
+@page "/usuarios"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Users
 @attribute [Authorize]
@@ -52,7 +52,7 @@ else
 {
     <table>
         <thead>
-            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Grupos</th><th>Último acceso</th><th>Activo</th></tr>
+            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Grupos</th><th>Último acceso</th><th>Activo</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var u in _users)
@@ -78,6 +78,12 @@ else
                     <td>@(u.LastLogin?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—")</td>
                     <td>
                         <input type="checkbox" checked="@u.IsActive" @onchange="e => SetActiveAsync(u.Id, e.Value is bool b && b)" />
+                    </td>
+                    <td>
+                        @if (u.Pending)
+                        {
+                            <button @onclick="() => DeletePendingAsync(u.Id)">Eliminar</button>
+                        }
                     </td>
                 </tr>
             }
@@ -134,6 +140,13 @@ else
     {
         var (ok, error) = await Servicio.SetActiveAsync(userId, active);
         SetMessage(ok ? (active ? "Usuario activado." : "Usuario desactivado.") : error ?? "No se pudo cambiar.", !ok);
+        await LoadAsync();
+    }
+
+    private async Task DeletePendingAsync(Guid userId)
+    {
+        var (ok, error) = await Servicio.DeletePendingAsync(userId);
+        SetMessage(ok ? "Ficha pendiente eliminada." : error ?? "No se pudo eliminar.", !ok);
         await LoadAsync();
     }
 

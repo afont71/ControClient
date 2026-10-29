@@ -251,6 +251,53 @@ public static class SystemEndpoints
             return Results.Ok(new { target.Id, target.IsActive });
         }).RequireAuthorization();
 
+        // Eliminar SOLO fichas pendientes (nunca han entrado). Un usuario real se
+        // desactiva: borrarlo rompería auditoría y se recrearía en el siguiente acceso.
+        app.MapDelete("/api/v1/users/{id:guid}", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            AppDbContext db,
+            IAuditWriter audit,
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
+        {
+            var actor = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (actor is null)
+                return Results.Unauthorized();
+
+            if (!actor.IsIn(AppRole.Administrator))
+                return Results.Forbid();
+
+            var target = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+            if (target is null)
+                return Results.NotFound();
+
+            if (target.Id == actor.Id)
+                return Results.Conflict(new { error = "No puedes eliminar tu propia cuenta." });
+
+            if (!target.IsPending)
+                return Results.Conflict(new
+                {
+                    error = "Solo se pueden eliminar fichas pendientes (sin primer acceso). " +
+                            "Para un usuario real, desactívalo: conserva su historial y evita recrearlo."
+                });
+
+            var email = target.Email;
+            db.Users.Remove(target);
+            await db.SaveChangesAsync(ct);
+
+            await audit.WriteAsync(new AuditEvent(
+                entity: "users",
+                action: "users.delete_pending",
+                actorName: actor.DisplayName,
+                actorObjectId: actor.EntraObjectId,
+                correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
+                reason: $"usuario={email}"), ct);
+
+            return Results.NoContent();
+        }).RequireAuthorization();
+
         return app;
     }
 
