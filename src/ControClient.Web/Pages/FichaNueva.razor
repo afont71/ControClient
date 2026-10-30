@@ -1,4 +1,4 @@
-@page "/clientes/{ClientId:guid}/fichas/nueva"
+﻿@page "/clientes/{ClientId:guid}/fichas/nueva"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject FormPageService Fichas
@@ -70,6 +70,8 @@ else
                             @field.Label @(field.Required ? "*" : "")
                             <span class="inline small">
                                 <input type="checkbox" checked="@_secretFlag[field.Key]"
+                                       disabled="@(!_canManageSecrecy)"
+                                       title="@(_canManageSecrecy ? "Marcar o desmarcar secreto" : "Requiere permisos de bóveda")"
                                        @onchange="e => SetSecretFlag(field.Key, e)" />
                                 Secreto
                             </span>
@@ -161,6 +163,7 @@ else
     private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, bool> _secretFlag = new(StringComparer.OrdinalIgnoreCase);
+    private bool _canManageSecrecy;
     private Dictionary<string, string[]> _errors = new();
     private string _templateId = string.Empty;
     private string? _presetName;
@@ -172,6 +175,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         _templates = await Fichas.TemplatesAsync();
+        _canManageSecrecy = await Fichas.CanManageSecrecyAsync(ClientId);
 
         if (TemplateId is Guid preset)
         {

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using ControClient.Infrastructure.Vault;
 using ControClient.Domain.Forms;
@@ -58,6 +58,7 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         string createdBy,
         IReadOnlyDictionary<string, string>? secretValues = null,
         IReadOnlyDictionary<string, bool>? secretFlags = null,
+        bool allowSecrecyChange = false,
         CancellationToken ct = default)
     {
         if (!await db.Clients.AnyAsync(c => c.Id == clientId, ct))
@@ -66,6 +67,9 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         var template = await GetActiveTemplateAsync(templateId, ct);
         if (template is null)
             return (null, null, "La plantilla no existe o está inactiva.");
+
+        if (!allowSecrecyChange && SecrecyChanged(template, secretFlags, null))
+            return (null, null, "Solo la administración de la bóveda puede cambiar la condición de secreto.");
 
         var effective = EffectiveSecrecy(template, secretFlags, null);
         var valueObject = ToObject(values);
@@ -96,6 +100,7 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         IReadOnlyDictionary<string, string>? secretValues = null,
         string? updatedBy = null,
         IReadOnlyDictionary<string, bool>? secretFlags = null,
+        bool allowSecrecyChange = false,
         CancellationToken ct = default)
     {
         var record = await db.Records.FirstOrDefaultAsync(r => r.Id == recordId, ct);
@@ -117,6 +122,9 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         var existingSecrets = await db.RecordSecrets.AsNoTracking()
             .Where(s => s.RecordId == recordId)
             .ToListAsync(ct);
+
+        if (!allowSecrecyChange && SecrecyChanged(template, secretFlags, existingFlags))
+            return (null, null, "Solo la administración de la bóveda puede cambiar la condición de secreto.", false, false);
 
         var effective = EffectiveSecrecy(template, secretFlags, existingFlags);
         var valueObject = ToObject(values);
@@ -200,6 +208,31 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         }
 
         return map;
+    }
+
+    /// <summary>¿La petición cambia la condición de secreto de algún campo?</summary>
+    private static bool SecrecyChanged(
+        FormTemplate template,
+        IReadOnlyDictionary<string, bool>? requested,
+        IReadOnlyDictionary<string, bool>? existing)
+    {
+        if (requested is null)
+            return false;
+
+        foreach (var field in template.Fields)
+        {
+            if (!requested.TryGetValue(field.Key, out var wanted))
+                continue;
+
+            var current = existing is not null && existing.TryGetValue(field.Key, out var saved)
+                ? saved
+                : field.IsSecret;
+
+            if (wanted != current)
+                return true;
+        }
+
+        return false;
     }
 
     private static JsonObject ToObject(JsonElement values) =>

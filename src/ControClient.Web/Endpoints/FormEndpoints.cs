@@ -133,8 +133,9 @@ public static class FormEndpoints
             if (!await access.CanEditAsync(user, clientId, ct))
                 return Results.Forbid();
 
+            var canManageSecrecy = await access.CanManageSecrecyAsync(user, clientId, ct);
             var (record, errors, error) = await forms.CreateRecordAsync(
-                clientId, request.TemplateId, request.Title, request.Values, user.DisplayName, request.Secrets, request.SecretFlags, ct: ct);
+                clientId, request.TemplateId, request.Title, request.Values, user.DisplayName, request.Secrets, request.SecretFlags, canManageSecrecy, ct: ct);
 
             if (errors is not null)
                 return Results.ValidationProblem(errors.ToDictionary(e => e.Key, e => e.Value));
@@ -230,8 +231,9 @@ public static class FormEndpoints
             if (!await access.CanEditRecordAsync(user, existing.ClientId, existing.Id, ct))
                 return Results.Forbid();
 
+            var canManageSecrecy = await access.CanManageSecrecyAsync(user, existing.ClientId, ct);
             var (record, errors, error, notFound, conflict) = await forms.UpdateRecordAsync(
-                id, request.Title, request.Values, request.Version, request.Secrets, user.DisplayName, request.SecretFlags, ct: ct);
+                id, request.Title, request.Values, request.Version, request.Secrets, user.DisplayName, request.SecretFlags, canManageSecrecy, ct: ct);
 
             if (conflict)
                 return Results.Conflict(new { error });

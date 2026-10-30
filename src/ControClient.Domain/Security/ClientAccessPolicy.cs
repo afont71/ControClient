@@ -1,4 +1,4 @@
-using ControClient.Domain.Users;
+﻿using ControClient.Domain.Users;
 
 namespace ControClient.Domain.Security;
 
@@ -16,6 +16,12 @@ public interface IClientAccessPolicy
 
     /// <summary>El rol puede revelar secretos si además tiene concesión sobre el cliente.</summary>
     bool CanRevealSecretsByRole(AppUser user);
+
+    /// <summary>
+    /// Cambiar la condición de secreto de un dato (marcar o desmarcar) es una
+    /// capacidad de bóveda, no un permiso de cliente.
+    /// </summary>
+    bool CanManageSecrecy(AppUser user);
 
     bool CanViewClient(AppUser user, Guid clientId, IReadOnlyCollection<Guid> grantedClientIds);
 
@@ -40,6 +46,9 @@ public sealed class ClientAccessPolicy : IClientAccessPolicy
 
     public bool CanEditAnyClient(AppUser user) =>
         user is not null && user.IsActive && user.Role == AppRole.Administrator;
+
+    public bool CanManageSecrecy(AppUser user) =>
+        user is not null && user.IsActive && user.Role is AppRole.Administrator or AppRole.VaultCustodian;
 
     public bool CanRevealSecretsByRole(AppUser user) =>
         user is not null && user.IsActive && CanReveal.Contains(user.Role);

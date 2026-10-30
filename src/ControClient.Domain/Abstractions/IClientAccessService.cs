@@ -29,4 +29,7 @@ public interface IClientAccessService
 
     /// <summary>Revelar un campo secreto de una ficha: la excepción de la ficha manda.</summary>
     Task<bool> CanRevealRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default);
+
+    /// <summary>Marcar o desmarcar un campo como secreto: capacidad de bóveda + ver el cliente.</summary>
+    Task<bool> CanManageSecrecyAsync(AppUser user, Guid clientId, CancellationToken ct = default);
 }

@@ -72,6 +72,14 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         return (actions & GrantActions.RevealSecret) == GrantActions.RevealSecret;
     }
 
+    public async Task<bool> CanManageSecrecyAsync(AppUser user, Guid clientId, CancellationToken ct = default)
+    {
+        if (!user.IsActive || !policy.CanManageSecrecy(user))
+            return false;
+
+        return await CanViewAsync(user, clientId, ct);
+    }
+
     public async Task<bool> CanRevealRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default)
     {
         if (!await CanViewRecordAsync(user, clientId, recordId, ct))
