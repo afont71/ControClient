@@ -17,6 +17,9 @@ public sealed class ExpirationsPageService(
     public async Task<IReadOnlyList<Row>?> ListAsync(int horizonDays)
     {
         using var scope = scopes.CreateScope();
+        if (scope.ServiceProvider.GetService(typeof(ControClient.Web.Security.VaultLockService)) is ControClient.Web.Security.VaultLockService gate && await gate.IsLockedAsync())
+            return null;
+
         var sp = scope.ServiceProvider;
 
         var state = await auth.GetAuthenticationStateAsync();

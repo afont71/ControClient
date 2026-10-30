@@ -254,6 +254,9 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
         var access = sp.GetRequiredService<IClientAccessService>();
         var forms = sp.GetRequiredService<FormService>();
 
+        if (await sp.GetRequiredService<ControClient.Web.Security.VaultLockService>().IsLockedAsync())
+            return (null, access, forms);
+
         if (current is null)
             return (null, access, forms);
 

@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
 using ControClient.Web.Security;
@@ -15,6 +15,9 @@ public sealed class AuditPageService(IServiceScopeFactory scopes, Authentication
     public async Task<IReadOnlyList<EventRow>?> ListAsync(string? action, string? actor, int limit = 200)
     {
         using var scope = scopes.CreateScope();
+        if (scope.ServiceProvider.GetService(typeof(ControClient.Web.Security.VaultLockService)) is ControClient.Web.Security.VaultLockService gate && await gate.IsLockedAsync())
+            return null;
+
         var sp = scope.ServiceProvider;
 
         var state = await auth.GetAuthenticationStateAsync();

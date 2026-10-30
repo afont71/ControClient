@@ -69,6 +69,7 @@ builder.Services.AddScoped<ControClient.Web.Pages.TemplatesPageService>();
  builder.Services.AddScoped<ControClient.Infrastructure.Expirations.ExpirationsService>();
 builder.Services.AddScoped<ControClient.Web.Pages.ExpirationsPageService>();
 builder.Services.AddScoped<ControClient.Web.NavService>();
+builder.Services.AddScoped<ControClient.Web.Security.VaultLockService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
 var useDevAuth = builder.Environment.IsDevelopment()
@@ -214,6 +215,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseMiddleware<ControClient.Web.Security.TenantGuardMiddleware>();
 app.UseMiddleware<ControClient.Web.Security.UserProvisioningMiddleware>();
+app.UseMiddleware<ControClient.Web.Security.VaultLockMiddleware>();
 app.UseAuthorization();
 
 app.UseAntiforgery();

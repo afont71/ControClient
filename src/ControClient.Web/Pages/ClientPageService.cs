@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Users;
@@ -226,6 +226,9 @@ public sealed class ClientPageService(IServiceScopeFactory scopes, Authenticatio
 
     private async Task<(AppUser? User, IClientAccessService Access, AppDbContext Db)> ResolveAsync(IServiceProvider sp)
     {
+        if (await sp.GetRequiredService<ControClient.Web.Security.VaultLockService>().IsLockedAsync())
+            return (null, sp.GetRequiredService<IClientAccessService>(), sp.GetRequiredService<AppDbContext>());
+
         var state = await auth.GetAuthenticationStateAsync();
         var current = CurrentUser.FromPrincipal(state.User);
         if (current is null)

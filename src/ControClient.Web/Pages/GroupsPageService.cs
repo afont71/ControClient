@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Groups;
@@ -196,6 +196,10 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
         var state = await auth.GetAuthenticationStateAsync();
         var current = CurrentUser.FromPrincipal(state.User);
         var db = sp.GetRequiredService<AppDbContext>();
+
+        if (await sp.GetRequiredService<ControClient.Web.Security.VaultLockService>().IsLockedAsync())
+            return (null, db);
+
         if (current is null)
             return (null, db);
 

@@ -17,6 +17,9 @@ public sealed class InfoPageService(IServiceScopeFactory scopes, AuthenticationS
     public async Task<IReadOnlyList<InfoRow>?> SearchAsync(string? text, Guid? templateId, Guid? clientId)
     {
         using var scope = scopes.CreateScope();
+        if (scope.ServiceProvider.GetService(typeof(ControClient.Web.Security.VaultLockService)) is ControClient.Web.Security.VaultLockService gate && await gate.IsLockedAsync())
+            return null;
+
         var sp = scope.ServiceProvider;
 
         var state = await auth.GetAuthenticationStateAsync();

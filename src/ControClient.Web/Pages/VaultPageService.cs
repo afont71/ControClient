@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Users;
 using ControClient.Domain.Vault;
@@ -78,6 +78,9 @@ public sealed class VaultPageService(IServiceScopeFactory scopes, Authentication
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
+
+        if (await sp.GetRequiredService<ControClient.Web.Security.VaultLockService>().IsLockedAsync())
+            return ([], false);
         var (user, access, vault) = await ResolveAccessAsync(sp);
         if (user is null || !await access.CanViewAsync(user, clientId))
             return ([], false);

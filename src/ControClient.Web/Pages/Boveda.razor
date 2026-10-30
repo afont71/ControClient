@@ -1,12 +1,17 @@
-﻿@page "/boveda"
+@page "/boveda"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject VaultPageService Servicio
 @inject NavService Nav
+@inject NavigationManager Nav2
 
 <PageTitle>Bóveda</PageTitle>
 
 <h1>Bóveda</h1>
+@if (_status is not null && !_status.Unsealed)
+{
+    <p><span class="badge danger">Bóveda sellada</span> La aplicación permanece cerrada hasta desellarla.</p>
+}
 
 @if (!_isAdmin)
 {
@@ -22,8 +27,8 @@ else
         <tbody>
             <tr><th>Constituida</th><td>@(_status.Initialized ? "Sí" : "No")</td></tr>
             <tr><th>Estado</th><td>@(_status.Unsealed ? "Desellada" : "Sellada")</td></tr>
-            <tr><th>Credenciales</th><td>@_status.Items</td></tr>
-            <tr><th>Protección de la clave</th><td>@_status.Protection</td></tr>
+            <tr><th>Credenciales</th><td>@(_status.Unsealed ? _status.Items.ToString() : "—")</td></tr>
+            <tr><th>Protección de la clave</th><td>@(_status.Unsealed ? _status.Protection : "—")</td></tr>
         </tbody>
     </table>
 
@@ -106,6 +111,12 @@ else
             var (ok, error) = await Servicio.UnsealAsync();
             SetMessage(ok ? "Bóveda desellada." : error ?? "No se pudo desellar.", !ok);
             await LoadAsync();
+
+            if (ok)
+            {
+                // Recarga completa: el menú vuelve a mostrar las secciones.
+                Nav2.NavigateTo("/", forceLoad: true);
+            }
         }
         finally
         {
@@ -121,6 +132,9 @@ else
             await Servicio.LockAsync();
             SetMessage("Bóveda sellada.", false);
             await LoadAsync();
+
+            // Recarga para aplicar el cierre inmediatamente en la interfaz.
+            Nav2.NavigateTo("/boveda", forceLoad: true);
         }
         finally
         {

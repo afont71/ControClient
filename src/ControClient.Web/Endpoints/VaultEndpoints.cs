@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Security.Cryptography;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
@@ -31,8 +31,9 @@ public static class VaultEndpoints
             {
                 initialized = status.Initialized,
                 unsealed = status.Unsealed,
-                items = status.Items,
-                protection = vault.KeyProtectionDescription
+                // Con la bóveda sellada no se revela ni el número de credenciales.
+                items = status.Unsealed ? status.Items : 0,
+                protection = status.Unsealed ? vault.KeyProtectionDescription : null
             });
         });
 
