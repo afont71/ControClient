@@ -91,7 +91,7 @@ public sealed class ClientPageService(IServiceScopeFactory scopes, Authenticatio
         if (user is null)
             return (false, "Sesión no válida.");
 
-        if (!user.IsIn(AppRole.Administrator, AppRole.ClientManager))
+        if (!user.IsIn(AppRole.Administrator))
             return (false, "No tienes permiso para crear clientes.");
 
         if (string.IsNullOrWhiteSpace(name))

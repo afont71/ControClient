@@ -7,11 +7,9 @@ public static class Ui
     public static IReadOnlyList<string> AssignableRoles { get; } =
     [
         nameof(ControClient.Domain.Users.AppRole.Administrator),
-        nameof(ControClient.Domain.Users.AppRole.ClientManager),
         nameof(ControClient.Domain.Users.AppRole.Technician),
         nameof(ControClient.Domain.Users.AppRole.Auditor),
-        nameof(ControClient.Domain.Users.AppRole.ReadOnly),
-        nameof(ControClient.Domain.Users.AppRole.VaultCustodian)
+        nameof(ControClient.Domain.Users.AppRole.ReadOnly)
     ];
 
     public static string StatusLabel(string? status) => status switch

@@ -27,7 +27,7 @@ public sealed class AuditPageService(IServiceScopeFactory scopes, Authentication
 
         var prov = sp.GetRequiredService<IUserProvisioner>();
         var user = await prov.GetOrCreateAsync(current.ObjectId, current.Name, null);
-        if (!user.IsIn(AppRole.Administrator, AppRole.Auditor, AppRole.VaultCustodian))
+        if (!user.IsIn(AppRole.Administrator, AppRole.Auditor))
             return null;
 
         var db = sp.GetRequiredService<AppDbContext>();

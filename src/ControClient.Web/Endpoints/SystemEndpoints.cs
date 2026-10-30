@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Security.Claims;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
@@ -68,7 +68,7 @@ public static class SystemEndpoints
             if (user is null)
                 return Results.Unauthorized();
 
-            if (!user.IsIn(AppRole.Administrator, AppRole.Auditor, AppRole.VaultCustodian))
+            if (!user.IsIn(AppRole.Administrator, AppRole.Auditor))
                 return Results.Forbid();
 
             var events = await db.AuditEvents

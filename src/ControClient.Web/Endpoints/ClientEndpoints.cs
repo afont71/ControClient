@@ -126,7 +126,7 @@ public static class ClientEndpoints
             if (user is null)
                 return Results.Unauthorized();
 
-            if (!user.IsIn(AppRole.Administrator, AppRole.ClientManager))
+            if (!user.IsIn(AppRole.Administrator))
                 return Results.Forbid();
 
             if (string.IsNullOrWhiteSpace(request.Name))

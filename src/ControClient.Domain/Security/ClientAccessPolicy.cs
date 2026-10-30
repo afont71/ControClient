@@ -35,10 +35,10 @@ public sealed class ClientAccessPolicy : IClientAccessPolicy
     private static readonly HashSet<AppRole> GlobalView = [AppRole.Administrator, AppRole.Auditor];
     private static readonly HashSet<AppRole> ScopedView =
     [
-        AppRole.ClientManager, AppRole.Technician, AppRole.ReadOnly,
-        AppRole.VaultCustodian, AppRole.MigrationOperator, AppRole.Acceptance
+        AppRole.Technician, AppRole.ReadOnly,
+        AppRole.MigrationOperator, AppRole.Acceptance
     ];
-    private static readonly HashSet<AppRole> CanEdit = [AppRole.Administrator, AppRole.ClientManager, AppRole.Technician];
+    private static readonly HashSet<AppRole> CanEdit = [AppRole.Administrator, AppRole.Technician];
     private static readonly HashSet<AppRole> CanReveal = [AppRole.Technician, AppRole.VaultCustodian];
 
     public bool CanViewAnyClient(AppUser user) =>
@@ -48,7 +48,7 @@ public sealed class ClientAccessPolicy : IClientAccessPolicy
         user is not null && user.IsActive && user.Role == AppRole.Administrator;
 
     public bool CanManageSecrecy(AppUser user) =>
-        user is not null && user.IsActive && user.Role is AppRole.Administrator or AppRole.VaultCustodian;
+        user is not null && user.IsActive && user.Role == AppRole.Administrator;
 
     public bool CanRevealSecretsByRole(AppUser user) =>
         user is not null && user.IsActive && CanReveal.Contains(user.Role);
