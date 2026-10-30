@@ -38,23 +38,47 @@ else
             </label>
             </p>
         <p>
-            <strong>Grupos</strong> <span class="muted">(los permisos de sus clientes se heredan al entrar)</span><br />
-            @if (_groups.Count == 0)
+            <strong>Grupos</strong> <span class="muted">(los permisos de sus clientes se heredan al entrar)</span>
+        </p>
+
+        <div class="chips">
+            @if (_selectedGroups.Count == 0)
             {
-                <span class="muted">No hay grupos creados todavía.</span>
+                <span class="muted small">Sin grupos asignados.</span>
             }
             else
             {
-                @foreach (var g in _groups)
+                @foreach (var groupId in _selectedGroups)
                 {
-                    <label class="inline" style="margin-right:1rem">
-                        <input type="checkbox" checked="@_selectedGroups.Contains(g.Id)"
-                               @onchange="e => ToggleGroup(g.Id, e)" />
-                        @g.Name
-                    </label>
+                    var groupName = _groups.FirstOrDefault(g => g.Id == groupId).Name ?? "grupo";
+                    <span class="chip">
+                        @groupName
+                        <button class="chip-remove" title="Quitar" @onclick="() => RemoveGroup(groupId)">×</button>
+                    </span>
                 }
             }
-        </p>
+        </div>
+
+        @if (_groups.Count == 0)
+        {
+            <p class="muted small">No hay grupos creados todavía.</p>
+        }
+        else
+        {
+            <div class="toolbar">
+                <label>Añadir grupo
+                    <select @bind="_groupToAdd">
+                        <option value="">Selecciona…</option>
+                        @foreach (var g in _groups.Where(g => !_selectedGroups.Contains(g.Id)))
+                        {
+                            <option value="@g.Id">@g.Name</option>
+                        }
+                    </select>
+                </label>
+                <button @onclick="AddGroupAsync" disabled="@string.IsNullOrEmpty(_groupToAdd)">Añadir</button>
+            </div>
+        }
+
         <p>
             <button @onclick="PreRegisterAsync" disabled="@_busy">Pre-registrar</button>
         </p>
@@ -129,6 +153,7 @@ else
     private bool _busy;
     private IReadOnlyList<(Guid Id, string Name)> _groups = [];
     private readonly HashSet<Guid> _selectedGroups = [];
+    private string _groupToAdd = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -136,11 +161,15 @@ else
         await LoadAsync();
     }
 
-    private void ToggleGroup(Guid groupId, ChangeEventArgs args)
+    private void AddGroupAsync()
     {
-        if (args.Value is bool on && on) _selectedGroups.Add(groupId);
-        else _selectedGroups.Remove(groupId);
+        if (Guid.TryParse(_groupToAdd, out var groupId))
+            _selectedGroups.Add(groupId);
+
+        _groupToAdd = string.Empty;
     }
+
+    private void RemoveGroup(Guid groupId) => _selectedGroups.Remove(groupId);
 
     private async Task LoadAsync() => _users = await Servicio.ListAsync();
 
@@ -159,6 +188,7 @@ else
             SetMessage("Usuario pre-registrado. Entrará con ese correo y conservará rol y grupos.", false);
             _newEmail = _newName = null;
             _selectedGroups.Clear();
+            _groupToAdd = string.Empty;
             await LoadAsync();
         }
         finally
