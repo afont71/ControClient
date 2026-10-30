@@ -44,7 +44,16 @@ else
                         <td>@(g.Description ?? "—")</td>
                         <td>@g.Members</td>
                         <td>@g.Clients</td>
-                        <td><button class="small" @onclick="() => SelectAsync(g.Id)">Gestionar</button></td>
+                        <td>
+                            @if (g.IsSystem)
+                            {
+                                <span class="muted small">acceso total · no editable</span>
+                            }
+                            else
+                            {
+                                <button class="small" @onclick="() => SelectAsync(g.Id)">Gestionar</button>
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>
