@@ -1,4 +1,4 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using ControClient.Domain.Vault;
 using ControClient.Domain.Users;
 using ControClient.Domain.Security;
@@ -27,22 +27,7 @@ public sealed class VaultService(
 
     public bool IsUnsealed => ring.IsUnsealed;
 
-    /// <summary>Gestionar la bóveda (constituir, desellar, sellar, recuperar) según el rol.</summary>
-    public async Task<bool> CanManageAsync(AppRole role, CancellationToken ct = default)
-    {
-        if (role == AppRole.Administrator)
-            return true;
-
-        var configured = await db.RoleVaultPermissions.AsNoTracking()
-            .Select(p => new { p.Role, p.Permission })
-            .ToListAsync(ct);
-
-        if (configured.Count == 0)
-            return role == AppRole.Administrator;
-
-        return configured.Any(p => p.Role == role
-            && p.Permission == ControClient.Domain.Security.VaultPermissions.Manage);
-    }
+    public string KeyProtectionDescription => protector.Description;
 
     private string KeyFilePath
     {
@@ -57,8 +42,6 @@ public sealed class VaultService(
             return Path.GetFullPath(path);
         }
     }
-
-    public string KeyProtectionDescription => protector.Description;
 
     /// <summary>Cifra un valor asociado a una ficha (campo secreto) con la clave viva.</summary>
     public (byte[] Nonce, byte[] Ciphertext, byte[] DekNonce, byte[] WrappedDek) SealValue(Guid aad, string plaintext)
@@ -88,6 +71,9 @@ public sealed class VaultService(
         }
     }
 
+    /// <summary>Gestionar la bóveda (desellar, sellar, constituir, recuperar): solo administrador.</summary>
+    public Task<bool> CanManageAsync(AppRole role, CancellationToken ct = default) =>
+        Task.FromResult(role == AppRole.Administrator);
     public async Task<(bool Initialized, bool Unsealed, int Items)> GetStatusAsync(CancellationToken ct = default) =>
         (IsInitialized, ring.IsUnsealed, await db.VaultItems.CountAsync(ct));
 

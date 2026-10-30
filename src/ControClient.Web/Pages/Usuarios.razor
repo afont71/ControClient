@@ -72,7 +72,7 @@ else
 {
     <table>
         <thead>
-            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Grupos</th><th>Último acceso</th><th>Activo</th><th></th></tr>
+            <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Grupos</th><th>Marcar secretos</th><th>Último acceso</th><th>Activo</th><th></th></tr>
         </thead>
         <tbody>
             @foreach (var u in _users)
@@ -95,6 +95,12 @@ else
                         </select>
                     </td>
                     <td>@(string.IsNullOrEmpty(u.Groups) ? "—" : u.Groups)</td>
+                    <td>
+                        <input type="checkbox" checked="@u.CanMarkSecrets"
+                               disabled="@(u.Role == "Administrator")"
+                               title="@(u.Role == "Administrator" ? "El administrador siempre puede" : "Permitir marcar o desmarcar secretos")"
+                               @onchange="e => SetMarkSecretsAsync(u.Id, e.Value is bool b && b)" />
+                    </td>
                     <td>@(u.LastLogin?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "—")</td>
                     <td>
                         <input type="checkbox" checked="@u.IsActive" @onchange="e => SetActiveAsync(u.Id, e.Value is bool b && b)" />
@@ -166,6 +172,13 @@ else
         if (string.IsNullOrWhiteSpace(role)) return;
         var (ok, error) = await Servicio.SetRoleAsync(userId, role);
         SetMessage(ok ? "Rol actualizado." : error ?? "No se pudo cambiar.", !ok);
+        await LoadAsync();
+    }
+
+    private async Task SetMarkSecretsAsync(Guid userId, bool allowed)
+    {
+        var (ok, error) = await Servicio.SetCanMarkSecretsAsync(userId, allowed);
+        SetMessage(ok ? "Permiso de secretos actualizado." : error ?? "No se pudo cambiar.", !ok);
         await LoadAsync();
     }
 

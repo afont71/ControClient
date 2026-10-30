@@ -740,6 +740,10 @@ namespace ControClient.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("CanMarkSecrets")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_mark_secrets");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");

@@ -1,4 +1,4 @@
-namespace ControClient.Domain.Users;
+﻿namespace ControClient.Domain.Users;
 
 /// <summary>
 /// Usuario de la aplicación. La identidad real vive en Entra ID: aquí solo se
@@ -39,6 +39,11 @@ public sealed class AppUser
 
         Email = string.IsNullOrWhiteSpace(email) ? Email : email.Trim();
     }
+
+    /// <summary>Puede marcar o desmarcar campos secretos (capacidad de bóveda por usuario).</summary>
+    public bool CanMarkSecrets { get; private set; }
+
+    public void SetCanMarkSecrets(bool value) => CanMarkSecrets = value;
 
     public void ChangeRole(AppRole role) => Role = role;
 

@@ -152,21 +152,16 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
     /// Permiso de bóveda configurado para el rol. Si no hay configuración, se
     /// mantiene el comportamiento histórico de la política.
     /// </summary>
-    private async Task<bool> HasVaultPermissionAsync(AppUser user, string permission, CancellationToken ct)
+    private Task<bool> HasVaultPermissionAsync(AppUser user, string permission, CancellationToken ct)
     {
-        var configured = await db.RoleVaultPermissions.AsNoTracking()
-            .Select(p => new { p.Role, p.Permission })
-            .ToListAsync(ct);
+        // La gestión de la bóveda es exclusiva del administrador. Marcar secretos
+        // es una capacidad del usuario, no del rol.
+        var allowed = permission == VaultPermissions.ManageSecrets
+            ? user.Role == AppRole.Administrator || user.CanMarkSecrets
+            : user.Role == AppRole.Administrator;
 
-        // Solo se usa la política histórica si no hay ninguna configuración.
-        if (configured.Count == 0)
-        {
-            return policy.CanManageSecrecy(user);
-        }
-
-        return configured.Any(p => p.Role == user.Role && p.Permission == permission);
+        return Task.FromResult(user.IsActive && allowed);
     }
-
     /// <summary>Unión de concesiones directas vigentes y de grupo (grupo activo).</summary>
     private async Task<GrantActions> GetEffectiveActionsAsync(Guid userId, Guid clientId, CancellationToken ct)
     {

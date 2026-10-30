@@ -12,7 +12,7 @@ namespace ControClient.Web.Pages;
 /// <summary>Gestión de usuarios para administración: rol, estado y grupos.</summary>
 public sealed class UsersPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
-    public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, DateTimeOffset? LastLogin, string Groups, bool Pending);
+    public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, bool CanMarkSecrets, DateTimeOffset? LastLogin, string Groups, bool Pending);
 
     public async Task<IReadOnlyList<(Guid Id, string Name)>> GroupsAsync()
     {
@@ -88,6 +88,7 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
             u.Email,
             u.Role.ToString(),
             u.IsActive,
+            u.CanMarkSecrets,
             u.LastLoginAt,
             string.Join(", ", memberships.Where(m => m.UserId == u.Id).Select(m => m.GroupName)),
             u.IsPending
@@ -113,6 +114,27 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         db.Users.Remove(target);
         await db.SaveChangesAsync();
         await AuditAsync(sp, actor, "users.delete_pending", $"usuario={email}");
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> SetCanMarkSecretsAsync(Guid userId, bool allowed)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (actor, db) = await ResolveAsync(sp);
+        if (actor is null || !actor.IsIn(AppRole.Administrator))
+            return (false, "Solo un administrador puede cambiar este permiso.");
+
+        var target = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (target is null)
+            return (false, "Usuario inexistente.");
+
+        if (target.Role == AppRole.Administrator && !allowed)
+            return (false, "Un administrador siempre puede marcar secretos.");
+
+        target.SetCanMarkSecrets(allowed);
+        await db.SaveChangesAsync();
+        await AuditAsync(sp, actor, "users.mark_secrets", $"usuario={target.EntraObjectId} permitido={allowed}");
         return (true, null);
     }
 

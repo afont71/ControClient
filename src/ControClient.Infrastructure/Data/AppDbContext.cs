@@ -73,6 +73,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Email).HasColumnName("email").HasMaxLength(320);
             e.Property(x => x.Role).HasColumnName("role").HasConversion<int>();
             e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CanMarkSecrets).HasColumnName("can_mark_secrets");
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
             e.HasIndex(x => x.EntraObjectId).IsUnique().HasDatabaseName("ux_users_entra_object_id");
