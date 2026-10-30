@@ -24,6 +24,7 @@ public sealed class RolePermissionsPageService(IServiceScopeFactory scopes, Auth
 
         var rows = await db.RoleVaultPermissions.AsNoTracking().ToListAsync();
         return Ui.AssignableRoles
+            .Where(name => name != nameof(AppRole.Administrator))
             .Select(name => Enum.Parse<AppRole>(name))
             .Select(role => new RoleRow(
                 role,

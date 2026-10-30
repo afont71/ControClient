@@ -30,6 +30,9 @@ public sealed class VaultService(
     /// <summary>Gestionar la bóveda (constituir, desellar, sellar, recuperar) según el rol.</summary>
     public async Task<bool> CanManageAsync(AppRole role, CancellationToken ct = default)
     {
+        if (role == AppRole.Administrator)
+            return true;
+
         var configured = await db.RoleVaultPermissions.AsNoTracking()
             .Select(p => new { p.Role, p.Permission })
             .ToListAsync(ct);
