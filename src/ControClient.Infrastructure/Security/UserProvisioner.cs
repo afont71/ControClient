@@ -1,4 +1,5 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
+using ControClient.Domain.Groups;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -85,6 +86,32 @@ public sealed class UserProvisioner(AppDbContext db, IConfiguration configuratio
         if (shouldSave)
             await db.SaveChangesAsync(ct);
 
+        await SyncSystemMembershipAsync(user, ct);
         return user;
+    }
+
+    /// <summary>Los administradores pertenecen al grupo de sistema; al dejar de serlo se les quita.</summary>
+    private async Task SyncSystemMembershipAsync(AppUser user, CancellationToken ct)
+    {
+        var systemGroup = await db.Groups.FirstOrDefaultAsync(g => g.IsSystem, ct);
+        if (systemGroup is null)
+            return;
+
+        var membership = await db.GroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == systemGroup.Id && m.UserId == user.Id, ct);
+
+        if (user.Role == AppRole.Administrator && user.IsActive)
+        {
+            if (membership is null)
+            {
+                db.GroupMembers.Add(new GroupMember(systemGroup.Id, user.Id, "sistema"));
+                await db.SaveChangesAsync(ct);
+            }
+        }
+        else if (membership is not null)
+        {
+            db.GroupMembers.Remove(membership);
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

@@ -16,7 +16,7 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
 {
     public async Task<IReadOnlyCollection<Guid>?> GetVisibleClientIdsAsync(AppUser user, CancellationToken ct = default)
     {
-        if (policy.CanViewAnyClient(user))
+        if (policy.CanViewAnyClient(user) || await IsSystemGroupMemberAsync(user.Id, ct))
             return null; // todos
 
         var now = DateTimeOffset.UtcNow;
@@ -142,6 +142,12 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         return await CanEditAsync(user, clientId, ct);
     }
 
+    private async Task<bool> IsSystemGroupMemberAsync(Guid userId, CancellationToken ct) =>
+        await (from m in db.GroupMembers.AsNoTracking()
+               join g in db.Groups.AsNoTracking() on m.GroupId equals g.Id
+               where m.UserId == userId && g.IsSystem && g.IsActive
+               select m.Id).AnyAsync(ct);
+
     /// <summary>
     /// Permiso de bóveda configurado para el rol. Si no hay configuración, se
     /// mantiene el comportamiento histórico de la política.
@@ -164,6 +170,10 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
     /// <summary>Unión de concesiones directas vigentes y de grupo (grupo activo).</summary>
     private async Task<GrantActions> GetEffectiveActionsAsync(Guid userId, Guid clientId, CancellationToken ct)
     {
+        // El grupo de sistema Administradores concede todo sobre cualquier cliente.
+        if (await IsSystemGroupMemberAsync(userId, ct))
+            return GrantActions.View | GrantActions.Edit | GrantActions.RevealSecret;
+
         var now = DateTimeOffset.UtcNow;
 
         var direct = await db.Grants.AsNoTracking()

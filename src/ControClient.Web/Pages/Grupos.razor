@@ -1,4 +1,4 @@
-@page "/grupos"
+﻿@page "/grupos"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
 @attribute [Authorize]
@@ -40,7 +40,7 @@ else
                 @foreach (var g in _groups)
                 {
                     <tr class="@(g.Id == _selectedId ? "selected" : "")">
-                        <td>@g.Name</td>
+                        <td>@g.Name @if (g.IsSystem) { <span class="badge">sistema</span> }</td>
                         <td>@(g.Description ?? "—")</td>
                         <td>@g.Members</td>
                         <td>@g.Clients</td>

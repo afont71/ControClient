@@ -136,6 +136,7 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
 
         target.ChangeRole(parsed);
         await db.SaveChangesAsync();
+        await SyncSystemMembershipAsync(db, target);
         await AuditAsync(sp, actor, "users.change_role", $"usuario={target.EntraObjectId} rol={parsed}");
         return (true, null);
     }
@@ -159,6 +160,30 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         await db.SaveChangesAsync();
         await AuditAsync(sp, actor, active ? "users.activate" : "users.deactivate", $"usuario={target.EntraObjectId}");
         return (true, null);
+    }
+
+    private static async Task SyncSystemMembershipAsync(AppDbContext db, AppUser user)
+    {
+        var systemGroup = await db.Groups.FirstOrDefaultAsync(g => g.IsSystem);
+        if (systemGroup is null)
+            return;
+
+        var membership = await db.GroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == systemGroup.Id && m.UserId == user.Id);
+
+        if (user.Role == AppRole.Administrator && user.IsActive)
+        {
+            if (membership is null)
+            {
+                db.GroupMembers.Add(new GroupMember(systemGroup.Id, user.Id, "sistema"));
+                await db.SaveChangesAsync();
+            }
+        }
+        else if (membership is not null)
+        {
+            db.GroupMembers.Remove(membership);
+            await db.SaveChangesAsync();
+        }
     }
 
     private async Task<(AppUser? Actor, AppDbContext Db)> ResolveAsync(IServiceProvider sp)

@@ -227,6 +227,30 @@ public class GroupAccessTests
     }
 
     [Fact]
+    public async Task El_grupo_de_sistema_da_acceso_total_sin_concesiones()
+    {
+        await using var db = Db();
+        var tech = User(AppRole.Technician);
+        var client = Client("Bodegas");
+        var system = new Group("Administradores", null, "sistema", isSystem: true);
+
+        db.Users.Add(tech);
+        db.Clients.Add(client);
+        db.Groups.Add(system);
+        await db.SaveChangesAsync();
+
+        db.GroupMembers.Add(new GroupMember(system.Id, tech.Id, "sistema"));
+        await db.SaveChangesAsync();
+
+        var service = new ClientAccessService(db, new ClientAccessPolicy());
+
+        Assert.Null(await service.GetVisibleClientIdsAsync(tech));
+        Assert.True(await service.CanViewAsync(tech, client.Id));
+        Assert.True(await service.CanEditAsync(tech, client.Id));
+        Assert.True(await service.CanRevealAsync(tech, client.Id));
+    }
+
+    [Fact]
     public async Task El_administrador_revela_si_la_concesion_lo_permite()
     {
         await using var db = Db();

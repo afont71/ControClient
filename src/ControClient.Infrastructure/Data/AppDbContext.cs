@@ -127,6 +127,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.IsSystem).HasColumnName("is_system");
             e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ux_groups_name");
 
             e.HasMany(x => x.Members).WithOne().HasForeignKey(m => m.GroupId)

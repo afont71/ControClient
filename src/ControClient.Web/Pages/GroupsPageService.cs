@@ -13,7 +13,7 @@ namespace ControClient.Web.Pages;
 /// <summary>Gestión de grupos: miembros y clientes asignados con permisos.</summary>
 public sealed class GroupsPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
-    public sealed record GroupRow(Guid Id, string Name, string? Description, bool IsActive, int Members, int Clients);
+    public sealed record GroupRow(Guid Id, string Name, string? Description, bool IsActive, bool IsSystem, int Members, int Clients);
     public sealed record ClientPermissionRow(Guid ClientId, string ClientName, int Actions);
     public sealed record RecordPermissionRow(Guid RecordId, string Title, string TemplateName, bool HasOverride, int EffectiveActions);
     public sealed record MemberRow(Guid UserId, string Name, string? Email);
@@ -30,7 +30,7 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
 
         return await db.Groups.AsNoTracking()
             .OrderBy(g => g.Name)
-            .Select(g => new GroupRow(g.Id, g.Name, g.Description, g.IsActive, g.Members.Count, g.Grants.Count))
+            .Select(g => new GroupRow(g.Id, g.Name, g.Description, g.IsActive, g.IsSystem, g.Members.Count, g.Grants.Count))
             .ToListAsync();
     }
 
@@ -110,6 +110,9 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
         if (actor is null || !actor.IsIn(AppRole.Administrator))
             return (false, "Solo un administrador puede gestionar grupos.");
 
+        if (await db.Groups.AnyAsync(g => g.Id == groupId && g.IsSystem))
+            return (false, "El grupo Administradores es de sistema: se gestiona solo con el rol.");
+
         if (!await db.Clients.AnyAsync(c => c.Id == clientId))
             return (false, "El cliente no existe.");
 
@@ -166,6 +169,9 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
         if (actor is null || !actor.IsIn(AppRole.Administrator))
             return (false, "Solo un administrador puede gestionar grupos.");
 
+        if (await db.Groups.AnyAsync(g => g.Id == groupId && g.IsSystem))
+            return (false, "El grupo Administradores es de sistema y ya tiene acceso total.");
+
         if (!await db.Records.AnyAsync(r => r.Id == recordId))
             return (false, "La ficha no existe.");
 
@@ -207,6 +213,9 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
         if (actor is null || !actor.IsIn(AppRole.Administrator))
             return (false, "Solo un administrador puede gestionar grupos.");
 
+        if (await db.Groups.AnyAsync(g => g.Id == groupId && g.IsSystem))
+            return (false, "El grupo Administradores es de sistema: sus miembros dependen del rol.");
+
         if (await db.GroupMembers.AnyAsync(m => m.GroupId == groupId && m.UserId == userId))
             return (true, null);
 
@@ -223,6 +232,9 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
         var (actor, db) = await ResolveAsync(sp);
         if (actor is null || !actor.IsIn(AppRole.Administrator))
             return (false, "Solo un administrador puede gestionar grupos.");
+
+        if (await db.Groups.AnyAsync(g => g.Id == groupId && g.IsSystem))
+            return (false, "El grupo Administradores es de sistema: sus miembros dependen del rol.");
 
         var member = await db.GroupMembers.FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == userId);
         if (member is null)

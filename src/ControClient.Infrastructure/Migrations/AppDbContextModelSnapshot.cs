@@ -572,6 +572,10 @@ namespace ControClient.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_system");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(150)

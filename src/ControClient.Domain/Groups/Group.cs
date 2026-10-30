@@ -1,4 +1,4 @@
-using ControClient.Domain.Clients;
+﻿using ControClient.Domain.Clients;
 
 namespace ControClient.Domain.Groups;
 
@@ -11,7 +11,7 @@ public sealed class Group
 {
     private Group() { }
 
-    public Group(string name, string? description, string createdBy)
+    public Group(string name, string? description, string createdBy, bool isSystem = false)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("El nombre del grupo es obligatorio.", nameof(name));
@@ -19,6 +19,7 @@ public sealed class Group
         Name = name.Trim();
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         CreatedBy = createdBy;
+        IsSystem = isSystem;
     }
 
     public Guid Id { get; private set; } = Guid.NewGuid();
@@ -27,6 +28,9 @@ public sealed class Group
     public string CreatedBy { get; private set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; private set; } = DateTimeOffset.UtcNow;
     public bool IsActive { get; private set; } = true;
+
+    /// <summary>Grupo de sistema: acceso total y no editable (Administradores).</summary>
+    public bool IsSystem { get; private set; }
 
     public List<GroupMember> Members { get; private set; } = [];
     public List<GroupGrant> Grants { get; private set; } = [];

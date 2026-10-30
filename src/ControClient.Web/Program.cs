@@ -324,6 +324,7 @@ if (app.Configuration.GetValue("Seeding:DefaultTemplates", true))
     var seedDb = seedScope.ServiceProvider.GetRequiredService<ControClient.Infrastructure.Data.AppDbContext>();
     await ControClient.Infrastructure.Forms.DefaultTemplateSeeder.SeedAsync(seedDb);
     await ControClient.Infrastructure.Security.VaultPermissionSeeder.SeedAsync(seedDb);
+    await ControClient.Infrastructure.Security.SystemGroupSeeder.SeedAsync(seedDb);
 }
 
 app.MapRazorComponents<App>()
