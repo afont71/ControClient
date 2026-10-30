@@ -73,6 +73,14 @@ public sealed class VaultLockMiddleware(RequestDelegate next)
             }
         }
 
+        // Sin sesión no se puede saber si es administrador: se le manda a la
+        // pantalla de desellado, que a su vez lanza el inicio de sesión.
+        if (context.User?.Identity?.IsAuthenticated != true)
+        {
+            context.Response.Redirect("/boveda");
+            return;
+        }
+
         if (path.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
         {
             context.Response.StatusCode = StatusCodes.Status423Locked;
