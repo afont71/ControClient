@@ -518,6 +518,35 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("record_secrets", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Forms.RecordSecretFlag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("field_key");
+
+                    b.Property<bool>("IsSecret")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_secret");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordId", "FieldKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_record_secret_flags_record_field");
+
+                    b.ToTable("record_secret_flags", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Groups.Group", b =>
                 {
                     b.Property<Guid>("Id")
@@ -977,6 +1006,16 @@ namespace ControClient.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_record_secrets_record");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Forms.RecordSecretFlag", b =>
+                {
+                    b.HasOne("ControClient.Domain.Forms.RecordInstance", null)
+                        .WithMany()
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_record_secret_flags_record");
                 });
 
             modelBuilder.Entity("ControClient.Domain.Groups.GroupGrant", b =>

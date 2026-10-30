@@ -1,4 +1,4 @@
-@page "/fichas/{Id:guid}"
+﻿@page "/fichas/{Id:guid}"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject FormPageService Fichas
@@ -30,10 +30,13 @@ else
             <tbody>
                 @foreach (var field in _view.Fields)
                 {
+                    var isSecret = _view.SecretFlags.TryGetValue(field.Key, out var secretOverride)
+                        ? secretOverride
+                        : field.IsSecret;
                     <tr>
                         <th>@field.Label</th>
                         <td>
-                            @if (field.IsSecret)
+                            @if (isSecret)
                             {
                                 @if (_revealed.TryGetValue(field.Key, out var revealed))
                                 {
@@ -82,8 +85,13 @@ else
             <p>
                 <label>
                     @field.Label @(field.Required ? "*" : "")
+                    <span class="inline small">
+                        <input type="checkbox" checked="@_secretFlag[field.Key]"
+                               @onchange="e => SetSecretFlag(field.Key, e)" />
+                        Secreto
+                    </span>
                     <br />
-                    @if (field.IsSecret)
+                    @if (_secretFlag[field.Key])
                     {
                         <input type="password" @bind="_secrets[field.Key]"
                                placeholder="Dejar vacío para conservar el secreto" autocomplete="new-password" />
@@ -157,6 +165,7 @@ else
     private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _revealed = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> _secretFlag = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string[]> _errors = new();
     private string _title = string.Empty;
     private bool _loading = true;
@@ -195,6 +204,7 @@ else
             if (_view.Text.TryGetValue(field.Key, out var text)) _text[field.Key] = text ?? string.Empty;
             if (_view.Bools.TryGetValue(field.Key, out var flag)) _bools[field.Key] = flag;
             if (_view.Multi.TryGetValue(field.Key, out var list)) _multi[field.Key] = [.. list];
+            _secretFlag[field.Key] = _view.SecretFlags.TryGetValue(field.Key, out var secretOverride) ? secretOverride : field.IsSecret;
         }
 
         _editing = true;
@@ -240,6 +250,29 @@ else
         }
     }
 
+    private void SetSecretFlag(string key, ChangeEventArgs args)
+    {
+        var on = args.Value is bool value && value;
+        _secretFlag[key] = on;
+
+        if (on)
+        {
+            if (!string.IsNullOrWhiteSpace(_text.GetValueOrDefault(key)))
+            {
+                _secrets[key] = _text[key] ?? string.Empty;
+                _text[key] = string.Empty;
+            }
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(_secrets.GetValueOrDefault(key)))
+            {
+                _text[key] = _secrets[key];
+                _secrets[key] = string.Empty;
+            }
+        }
+    }
+
     private async Task RevealAsync(string fieldKey)
     {
         if (_view is null) return;
@@ -267,7 +300,8 @@ else
         {
             var (ok, errors, error, conflict) = await Fichas.UpdateAsync(
                 _view.Id, _title, _view.Version, _view.Fields, _text, _bools, _multi,
-                _secrets.Where(s => !string.IsNullOrWhiteSpace(s.Value)).ToDictionary(s => s.Key, s => s.Value));
+                _secrets.Where(s => !string.IsNullOrWhiteSpace(s.Value)).ToDictionary(s => s.Key, s => s.Value),
+                _secretFlag);
 
             if (conflict)
             {

@@ -57,6 +57,7 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         JsonElement values,
         string createdBy,
         IReadOnlyDictionary<string, string>? secretValues = null,
+        IReadOnlyDictionary<string, bool>? secretFlags = null,
         CancellationToken ct = default)
     {
         if (!await db.Clients.AnyAsync(c => c.Id == clientId, ct))
@@ -66,19 +67,24 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         if (template is null)
             return (null, null, "La plantilla no existe o está inactiva.");
 
-        if (secretValues is { Count: > 0 } && !vault.IsUnsealed)
+        var effective = EffectiveSecrecy(template, secretFlags, null);
+        var valueObject = ToObject(values);
+        var secrets = MergeSecrets(valueObject, effective, secretValues);
+
+        if (secrets.Count > 0 && !vault.IsUnsealed)
             return (null, null, "La bóveda está sellada: desellala para guardar secretos.");
 
-        var validationValues = PrepareForValidation(values, template, secretValues, null);
+        var validationValues = PrepareForValidation(JsonSerializer.SerializeToElement(valueObject), effective, secrets, null);
         var outcome = RecordValidator.Validate(template, validationValues);
         if (!outcome.IsValid)
             return (null, outcome.Errors, null);
 
-        var record = new RecordInstance(clientId, template, title, StripSecretKeys(outcome.NormalizedJson!, template), createdBy);
+        var record = new RecordInstance(clientId, template, title, StripSecretKeys(outcome.NormalizedJson!, effective), createdBy);
         db.Records.Add(record);
         await db.SaveChangesAsync(ct);
 
-        await SaveSecretsAsync(record, template, secretValues, createdBy, ct);
+        await SaveSecretsAsync(record, effective, secrets, createdBy, ct);
+        await SaveFlagsAsync(record, template, effective, ct);
         return (record, null, null);
     }
 
@@ -89,6 +95,7 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         int expectedVersion,
         IReadOnlyDictionary<string, string>? secretValues = null,
         string? updatedBy = null,
+        IReadOnlyDictionary<string, bool>? secretFlags = null,
         CancellationToken ct = default)
     {
         var record = await db.Records.FirstOrDefaultAsync(r => r.Id == recordId, ct);
@@ -103,24 +110,59 @@ public sealed class FormService(AppDbContext db, VaultService vault)
         if (template is null)
             return (null, null, "La plantilla de la ficha ya no existe.", true, false);
 
-        if (secretValues is { Count: > 0 } && !vault.IsUnsealed)
+        var existingFlags = await db.RecordSecretFlags.AsNoTracking()
+            .Where(f => f.RecordId == recordId)
+            .ToDictionaryAsync(f => f.FieldKey, f => f.IsSecret, ct);
+
+        var existingSecrets = await db.RecordSecrets.AsNoTracking()
+            .Where(s => s.RecordId == recordId)
+            .ToListAsync(ct);
+
+        var effective = EffectiveSecrecy(template, secretFlags, existingFlags);
+        var valueObject = ToObject(values);
+
+        // Desclasificar: un campo que deja de ser secreto se descifra y se guarda
+        // en claro, salvo que el usuario haya escrito un valor nuevo.
+        foreach (var field in template.Fields.Where(f => !effective[f.Key]))
+        {
+            if (valueObject.ContainsKey(field.Key))
+                continue;
+
+            var stored = existingSecrets.FirstOrDefault(s => s.FieldKey == field.Key);
+            if (stored is null)
+                continue;
+
+            if (!vault.IsUnsealed)
+                return (null, null, "La bóveda está sellada: desellala para desclasificar el secreto.", false, false);
+
+            valueObject[field.Key] = vault.OpenValue(recordId, stored.Nonce, stored.Ciphertext, stored.DekNonce, stored.WrappedDek);
+        }
+
+        var secrets = MergeSecrets(valueObject, effective, secretValues);
+        if (secrets.Count > 0 && !vault.IsUnsealed)
             return (null, null, "La bóveda está sellada: desellala para guardar secretos.", false, false);
 
-        var existingKeys = await db.RecordSecrets.AsNoTracking()
-            .Where(s => s.RecordId == recordId).Select(s => s.FieldKey).ToListAsync(ct);
+        var validationValues = PrepareForValidation(JsonSerializer.SerializeToElement(valueObject), effective, secrets,
+            existingSecrets.Select(s => s.FieldKey).ToList());
 
-        var validationValues = PrepareForValidation(values, template, secretValues, existingKeys);
         var outcome = RecordValidator.Validate(template, validationValues);
         if (!outcome.IsValid)
             return (null, outcome.Errors, null, false, false);
 
-        if (!record.TryUpdate(title ?? record.Title, StripSecretKeys(outcome.NormalizedJson!, template), expectedVersion))
+        if (!record.TryUpdate(title ?? record.Title, StripSecretKeys(outcome.NormalizedJson!, effective), expectedVersion))
             return (null, null, "Conflicto de versión.", false, true);
 
         await db.SaveChangesAsync(ct);
-        await SaveSecretsAsync(record, template, secretValues, updatedBy ?? record.CreatedBy, ct);
+        await SaveSecretsAsync(record, effective, secrets, updatedBy ?? record.CreatedBy, ct);
+        await SaveFlagsAsync(record, template, effective, ct);
         return (record, null, null, false, false);
     }
+
+    /// <summary>Excepciones de secreto guardadas para una ficha.</summary>
+    public async Task<IReadOnlyDictionary<string, bool>> SecretFlagsAsync(Guid recordId, CancellationToken ct = default) =>
+        await db.RecordSecretFlags.AsNoTracking()
+            .Where(f => f.RecordId == recordId)
+            .ToDictionaryAsync(f => f.FieldKey, f => f.IsSecret, ct);
 
     /// <summary>Claves de los campos secretos que ya tienen valor cifrado.</summary>
     public async Task<IReadOnlyList<string>> SecretKeysAsync(Guid recordId, CancellationToken ct = default) =>
@@ -140,59 +182,151 @@ public sealed class FormService(AppDbContext db, VaultService vault)
             : vault.OpenValue(recordId, secret.Nonce, secret.Ciphertext, secret.DekNonce, secret.WrappedDek);
     }
 
+    /// <summary>Secreto efectivo por campo: pedido en la ficha, o excepción guardada, o el del tipo.</summary>
+    private static Dictionary<string, bool> EffectiveSecrecy(
+        FormTemplate template,
+        IReadOnlyDictionary<string, bool>? requested,
+        IReadOnlyDictionary<string, bool>? existing)
+    {
+        var map = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var field in template.Fields)
+        {
+            if (requested is not null && requested.TryGetValue(field.Key, out var wanted))
+                map[field.Key] = wanted;
+            else if (existing is not null && existing.TryGetValue(field.Key, out var saved))
+                map[field.Key] = saved;
+            else
+                map[field.Key] = field.IsSecret;
+        }
+
+        return map;
+    }
+
+    private static JsonObject ToObject(JsonElement values) =>
+        JsonNode.Parse(values.GetRawText()) as JsonObject ?? new JsonObject();
+
+    /// <summary>Pasa a secretos los valores que vienen en claro para campos secretos.</summary>
+    private static Dictionary<string, string> MergeSecrets(
+        JsonObject node,
+        IReadOnlyDictionary<string, bool> effective,
+        IReadOnlyDictionary<string, string>? provided)
+    {
+        var secrets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (provided is not null)
+            foreach (var pair in provided)
+                secrets[pair.Key] = pair.Value;
+
+        foreach (var key in effective.Where(p => p.Value).Select(p => p.Key).ToList())
+        {
+            if (node.TryGetPropertyValue(key, out var value)
+                && value is JsonValue jsonValue
+                && jsonValue.TryGetValue<string>(out var text)
+                && !string.IsNullOrWhiteSpace(text))
+            {
+                secrets[key] = text;
+                node.Remove(key);
+            }
+        }
+
+        foreach (var empty in secrets.Where(p => string.IsNullOrWhiteSpace(p.Value)).Select(p => p.Key).ToList())
+            secrets.Remove(empty);
+
+        return secrets;
+    }
+
     /// <summary>Mete un marcador en los campos secretos solo para validar; no se persiste.</summary>
     private static JsonElement PrepareForValidation(
-        JsonElement values, FormTemplate template,
-        IReadOnlyDictionary<string, string>? provided, IReadOnlyCollection<string>? existingKeys)
+        JsonElement values,
+        IReadOnlyDictionary<string, bool> effective,
+        IReadOnlyDictionary<string, string>? provided,
+        IReadOnlyCollection<string>? existingKeys)
     {
         var node = JsonNode.Parse(values.GetRawText()) as JsonObject ?? new JsonObject();
 
-        foreach (var field in template.Fields.Where(f => f.IsSecret))
+        foreach (var pair in effective.Where(p => p.Value))
         {
             var incoming = provided is not null
-                           && provided.TryGetValue(field.Key, out var value)
+                           && provided.TryGetValue(pair.Key, out var value)
                            && !string.IsNullOrWhiteSpace(value);
-            var existing = existingKeys?.Contains(field.Key) == true;
+            var existing = existingKeys?.Contains(pair.Key) == true;
 
             if (incoming || existing)
-                node[field.Key] = "••••";
+                node[pair.Key] = "••••";
         }
 
         return JsonSerializer.SerializeToElement(node);
     }
 
-    private static string StripSecretKeys(string json, FormTemplate template)
+    private static string StripSecretKeys(string json, IReadOnlyDictionary<string, bool> effective)
     {
         if (JsonNode.Parse(json) is not JsonObject node)
             return json;
 
-        foreach (var field in template.Fields.Where(f => f.IsSecret))
-            node.Remove(field.Key);
+        foreach (var key in effective.Where(p => p.Value).Select(p => p.Key))
+            node.Remove(key);
 
         return node.ToJsonString();
     }
 
     private async Task SaveSecretsAsync(
-        RecordInstance record, FormTemplate template,
-        IReadOnlyDictionary<string, string>? provided, string actor, CancellationToken ct)
+        RecordInstance record,
+        IReadOnlyDictionary<string, bool> effective,
+        IReadOnlyDictionary<string, string>? provided,
+        string actor,
+        CancellationToken ct)
     {
-        if (provided is null || provided.Count == 0)
-            return;
-
-        foreach (var field in template.Fields.Where(f => f.IsSecret))
+        foreach (var pair in effective)
         {
-            if (!provided.TryGetValue(field.Key, out var plain) || string.IsNullOrWhiteSpace(plain))
+            var existing = await db.RecordSecrets
+                .FirstOrDefaultAsync(s => s.RecordId == record.Id && s.FieldKey == pair.Key, ct);
+
+            if (!pair.Value)
+            {
+                // Ya no es secreto: el valor se descifró y quedó en el JSON.
+                if (existing is not null)
+                    db.RecordSecrets.Remove(existing);
+
+                continue;
+            }
+
+            if (provided is null || !provided.TryGetValue(pair.Key, out var plain) || string.IsNullOrWhiteSpace(plain))
                 continue;
 
             var sealedValue = vault.SealValue(record.Id, plain);
-            var existing = await db.RecordSecrets
-                .FirstOrDefaultAsync(s => s.RecordId == record.Id && s.FieldKey == field.Key, ct);
-
             if (existing is null)
-                db.RecordSecrets.Add(new RecordSecret(record.Id, field.Key,
+                db.RecordSecrets.Add(new RecordSecret(record.Id, pair.Key,
                     sealedValue.Nonce, sealedValue.Ciphertext, sealedValue.DekNonce, sealedValue.WrappedDek, actor));
             else
                 existing.Replace(sealedValue.Nonce, sealedValue.Ciphertext, sealedValue.DekNonce, sealedValue.WrappedDek, actor);
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SaveFlagsAsync(
+        RecordInstance record,
+        FormTemplate template,
+        IReadOnlyDictionary<string, bool> effective,
+        CancellationToken ct)
+    {
+        foreach (var field in template.Fields)
+        {
+            var wanted = effective[field.Key];
+            var existing = await db.RecordSecretFlags
+                .FirstOrDefaultAsync(f => f.RecordId == record.Id && f.FieldKey == field.Key, ct);
+
+            if (wanted == field.IsSecret)
+            {
+                if (existing is not null)
+                    db.RecordSecretFlags.Remove(existing);
+
+                continue;
+            }
+
+            if (existing is null)
+                db.RecordSecretFlags.Add(new RecordSecretFlag(record.Id, field.Key, wanted));
+            else if (existing.IsSecret != wanted)
+                db.RecordSecretFlags.Remove(existing);
         }
 
         await db.SaveChangesAsync(ct);

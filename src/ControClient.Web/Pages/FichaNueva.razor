@@ -1,4 +1,4 @@
-﻿@page "/clientes/{ClientId:guid}/fichas/nueva"
+@page "/clientes/{ClientId:guid}/fichas/nueva"
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 @inject FormPageService Fichas
@@ -68,7 +68,12 @@ else
                     <div class="field @(field.Type is "LongText" ? "wide" : "")">
                         <label>
                             @field.Label @(field.Required ? "*" : "")
-                            @if (field.IsSecret)
+                            <span class="inline small">
+                                <input type="checkbox" checked="@_secretFlag[field.Key]"
+                                       @onchange="e => SetSecretFlag(field.Key, e)" />
+                                Secreto
+                            </span>
+                            @if (_secretFlag[field.Key])
                             {
                                 <input type="password" @bind="_secrets[field.Key]" autocomplete="new-password" placeholder="Valor secreto" />
                                 <span class="muted small">Se guarda cifrado; solo se ve con permiso de revelar.</span>
@@ -155,6 +160,7 @@ else
     private readonly Dictionary<string, bool> _bools = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> _secretFlag = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string[]> _errors = new();
     private string _templateId = string.Empty;
     private string? _presetName;
@@ -206,6 +212,7 @@ else
             _text[field.Key] = string.Empty;
             _bools[field.Key] = false;
             _secrets[field.Key] = string.Empty;
+            _secretFlag[field.Key] = field.IsSecret;
         }
     }
 
@@ -232,6 +239,29 @@ else
         }
     }
 
+    private void SetSecretFlag(string key, ChangeEventArgs args)
+    {
+        var on = args.Value is bool value && value;
+        _secretFlag[key] = on;
+
+        if (on)
+        {
+            if (!string.IsNullOrWhiteSpace(_text.GetValueOrDefault(key)))
+            {
+                _secrets[key] = _text[key] ?? string.Empty;
+                _text[key] = string.Empty;
+            }
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(_secrets.GetValueOrDefault(key)))
+            {
+                _text[key] = _secrets[key];
+                _secrets[key] = string.Empty;
+            }
+        }
+    }
+
     private async Task SaveAsync()
     {
         if (!Guid.TryParse(_templateId, out var templateId))
@@ -254,7 +284,8 @@ else
         {
             var (recordId, errors, error) = await Fichas.CreateAsync(
                 ClientId, templateId, title, _fields, _text, _bools, _multi,
-                _secrets.Where(s => !string.IsNullOrWhiteSpace(s.Value)).ToDictionary(s => s.Key, s => s.Value));
+                _secrets.Where(s => !string.IsNullOrWhiteSpace(s.Value)).ToDictionary(s => s.Key, s => s.Value),
+                _secretFlag);
 
             if (errors is not null)
             {

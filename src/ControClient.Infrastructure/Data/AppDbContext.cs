@@ -23,6 +23,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GroupGrant> GroupGrants => Set<GroupGrant>();
     public DbSet<RecordGrant> RecordGrants => Set<RecordGrant>();
     public DbSet<RecordSecret> RecordSecrets => Set<RecordSecret>();
+    public DbSet<RecordSecretFlag> RecordSecretFlags => Set<RecordSecretFlag>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<Document> Documents => Set<Document>();
@@ -144,6 +145,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique().HasDatabaseName("ux_group_members_group_user");
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_members_user");
+        });
+
+        modelBuilder.Entity<RecordSecretFlag>(e =>
+        {
+            e.ToTable("record_secret_flags");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.RecordId).HasColumnName("record_id");
+            e.Property(x => x.FieldKey).HasColumnName("field_key").HasMaxLength(80).IsRequired();
+            e.Property(x => x.IsSecret).HasColumnName("is_secret");
+            e.HasIndex(x => new { x.RecordId, x.FieldKey }).IsUnique().HasDatabaseName("ux_record_secret_flags_record_field");
+            e.HasOne<RecordInstance>().WithMany().HasForeignKey(x => x.RecordId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_record_secret_flags_record");
         });
 
         modelBuilder.Entity<RecordSecret>(e =>

@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
@@ -134,7 +134,7 @@ public static class FormEndpoints
                 return Results.Forbid();
 
             var (record, errors, error) = await forms.CreateRecordAsync(
-                clientId, request.TemplateId, request.Title, request.Values, user.DisplayName, request.Secrets, ct: ct);
+                clientId, request.TemplateId, request.Title, request.Values, user.DisplayName, request.Secrets, request.SecretFlags, ct: ct);
 
             if (errors is not null)
                 return Results.ValidationProblem(errors.ToDictionary(e => e.Key, e => e.Value));
@@ -231,7 +231,7 @@ public static class FormEndpoints
                 return Results.Forbid();
 
             var (record, errors, error, notFound, conflict) = await forms.UpdateRecordAsync(
-                id, request.Title, request.Values, request.Version, request.Secrets, user.DisplayName, ct: ct);
+                id, request.Title, request.Values, request.Version, request.Secrets, user.DisplayName, request.SecretFlags, ct: ct);
 
             if (conflict)
                 return Results.Conflict(new { error });
@@ -347,6 +347,6 @@ public static class FormEndpoints
 
     public sealed record CreateTemplateRequest(string Key, string Name, string? Description, List<FieldRequest> Fields);
     public sealed record FieldRequest(string Key, string Label, string Type, bool Required = false, string[]? Options = null, string? HelpText = null, int Order = 0, bool IsSecret = false);
-    public sealed record CreateRecordRequest(Guid TemplateId, string Title, JsonElement Values, Dictionary<string, string>? Secrets = null);
-    public sealed record UpdateRecordRequest(string? Title, JsonElement Values, int Version, Dictionary<string, string>? Secrets = null);
+    public sealed record CreateRecordRequest(Guid TemplateId, string Title, JsonElement Values, Dictionary<string, string>? Secrets = null, Dictionary<string, bool>? SecretFlags = null);
+    public sealed record UpdateRecordRequest(string? Title, JsonElement Values, int Version, Dictionary<string, string>? Secrets = null, Dictionary<string, bool>? SecretFlags = null);
 }
