@@ -67,7 +67,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
         if (record is null)
             return (false, "La ficha no existe.");
 
-        if (!await access.CanEditAsync(user, record.ClientId))
+        if (!await access.CanEditRecordAsync(user, record.ClientId, record.Id))
             return (false, "No tienes permiso para modificar este cliente.");
 
         if (!await forms.DeleteRecordAsync(recordId))
@@ -98,7 +98,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
         if (template is null)
             return null;
 
-        var canEdit = await access.CanEditAsync(user, record.ClientId);
+        var canEdit = await access.CanEditRecordAsync(user, record.ClientId, record.Id);
         var text = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         var bools = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         var multi = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -172,7 +172,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             return (false, null, "Sesión no válida.", false);
 
         var existing = await forms.GetRecordAsync(recordId);
-        if (existing is null || !await access.CanEditAsync(user, existing.ClientId))
+        if (existing is null || !await access.CanEditRecordAsync(user, existing.ClientId, existing.Id))
             return (false, null, "No tienes permiso para modificar esta ficha.", false);
 
         var json = BuildJson(fields, text, bools, multi);

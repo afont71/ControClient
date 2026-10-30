@@ -581,6 +581,45 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("group_members", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Groups.RecordGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Actions")
+                        .HasColumnType("integer")
+                        .HasColumnName("actions");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<string>("GrantedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("granted_by");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordId");
+
+                    b.HasIndex("GroupId", "RecordId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_record_grants_group_record");
+
+                    b.ToTable("record_grants", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Users.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -903,6 +942,23 @@ namespace ControClient.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_group_members_user");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Groups.RecordGrant", b =>
+                {
+                    b.HasOne("ControClient.Domain.Groups.Group", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_record_grants_group");
+
+                    b.HasOne("ControClient.Domain.Forms.RecordInstance", null)
+                        .WithMany()
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_record_grants_record");
                 });
 
             modelBuilder.Entity("ControClient.Domain.Vault.VaultItem", b =>

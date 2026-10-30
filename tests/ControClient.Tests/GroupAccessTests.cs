@@ -1,4 +1,5 @@
-using ControClient.Domain.Clients;
+﻿using ControClient.Domain.Clients;
+using ControClient.Domain.Forms;
 using ControClient.Domain.Groups;
 using ControClient.Domain.Security;
 using ControClient.Domain.Users;
@@ -118,6 +119,40 @@ public class GroupAccessTests
         var service = new ClientAccessService(db, new ClientAccessPolicy());
         Assert.True(await service.CanRevealAsync(tech, client.Id));
         Assert.False(await service.CanEditAsync(tech, client.Id));
+    }
+
+    [Fact]
+    public async Task Permite_editar_una_ficha_concreta_con_el_cliente_en_solo_lectura()
+    {
+        await using var db = Db();
+        var tech = User(AppRole.Technician);
+        var client = Client("Bodegas");
+        var group = new Group("Soporte", null, "admin");
+        var template = new FormTemplate("licencia", "Licencia", null,
+        [
+            new FieldDefinition("producto", "Producto", FieldType.Text, required: true, order: 1)
+        ], version: 1);
+
+        db.Users.Add(tech);
+        db.Clients.Add(client);
+        db.Groups.Add(group);
+        db.FormTemplates.Add(template);
+        await db.SaveChangesAsync();
+
+        var editable = new RecordInstance(client.Id, template, "Office", "{\"producto\":\"Office\"}", "admin");
+        var otro = new RecordInstance(client.Id, template, "Acronis", "{\"producto\":\"Acronis\"}", "admin");
+        db.Records.AddRange(editable, otro);
+
+        db.GroupMembers.Add(new GroupMember(group.Id, tech.Id, "admin"));
+        db.GroupGrants.Add(new GroupGrant(group.Id, client.Id, GrantActions.View, "admin"));
+        db.RecordGrants.Add(new RecordGrant(group.Id, editable.Id, GrantActions.Edit, "admin"));
+        await db.SaveChangesAsync();
+
+        var service = new ClientAccessService(db, new ClientAccessPolicy());
+
+        Assert.False(await service.CanEditAsync(tech, client.Id));
+        Assert.True(await service.CanEditRecordAsync(tech, client.Id, editable.Id));
+        Assert.False(await service.CanEditRecordAsync(tech, client.Id, otro.Id));
     }
 
     [Fact]

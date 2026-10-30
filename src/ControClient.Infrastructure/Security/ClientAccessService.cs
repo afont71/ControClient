@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Security;
 using ControClient.Domain.Users;
@@ -70,6 +70,23 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
 
         var actions = await GetEffectiveActionsAsync(user.Id, clientId, ct);
         return (actions & GrantActions.RevealSecret) == GrantActions.RevealSecret;
+    }
+
+    public async Task<bool> CanEditRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default)
+    {
+        if (!user.IsActive)
+            return false;
+
+        if (await CanEditAsync(user, clientId, ct))
+            return true;
+
+        // Permiso puntual sobre una ficha, concedido a alguno de sus grupos.
+        return await (from rg in db.RecordGrants.AsNoTracking()
+                      join m in db.GroupMembers.AsNoTracking() on rg.GroupId equals m.GroupId
+                      join g in db.Groups.AsNoTracking() on rg.GroupId equals g.Id
+                      where m.UserId == user.Id && rg.RecordId == recordId && g.IsActive
+                            && (rg.Actions & GrantActions.Edit) == GrantActions.Edit
+                      select rg.Id).AnyAsync(ct);
     }
 
     /// <summary>Unión de concesiones directas vigentes y de grupo (grupo activo).</summary>

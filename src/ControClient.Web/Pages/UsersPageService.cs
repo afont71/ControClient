@@ -1,5 +1,6 @@
 ﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
+using ControClient.Domain.Groups;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
 using ControClient.Web.Security;
@@ -13,7 +14,22 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
 {
     public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, DateTimeOffset? LastLogin, string Groups, bool Pending);
 
-    public async Task<(Guid? Id, string? Error)> PreRegisterAsync(string email, string? displayName, string role)
+    public async Task<IReadOnlyList<(Guid Id, string Name)>> GroupsAsync()
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (actor, db) = await ResolveAsync(sp);
+        if (actor is null || !actor.IsIn(AppRole.Administrator))
+            return [];
+
+        return await db.Groups.AsNoTracking().Where(g => g.IsActive)
+            .OrderBy(g => g.Name)
+            .Select(g => new ValueTuple<Guid, string>(g.Id, g.Name))
+            .ToListAsync();
+    }
+
+    public async Task<(Guid? Id, string? Error)> PreRegisterAsync(
+        string email, string? displayName, string role, IReadOnlyCollection<Guid>? groupIds = null)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -36,7 +52,17 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         db.Users.Add(entity);
         await db.SaveChangesAsync();
 
-        await AuditAsync(sp, actor, "users.pre_register", $"usuario={normalized} rol={parsed}");
+        // Grupos: los permisos se heredan de sus clientes en cuanto entre.
+        if (groupIds is { Count: > 0 })
+        {
+            var valid = await db.Groups.Where(g => groupIds.Contains(g.Id) && g.IsActive).Select(g => g.Id).ToListAsync();
+            foreach (var groupId in valid)
+                db.GroupMembers.Add(new GroupMember(groupId, entity.Id, actor.DisplayName));
+
+            await db.SaveChangesAsync();
+        }
+
+        await AuditAsync(sp, actor, "users.pre_register", $"usuario={normalized} rol={parsed} grupos={groupIds?.Count ?? 0}");
         return (entity.Id, null);
     }
 

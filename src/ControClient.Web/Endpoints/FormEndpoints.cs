@@ -167,7 +167,7 @@ public static class FormEndpoints
                 return Results.NotFound();
 
             var template = await forms.GetTemplateAsync(record.TemplateId, ct);
-            var canEdit = await access.CanEditAsync(user, record.ClientId, ct);
+            var canEdit = await access.CanEditRecordAsync(user, record.ClientId, record.Id, ct);
 
             return Results.Ok(new
             {
@@ -218,7 +218,7 @@ public static class FormEndpoints
             if (existing is null || !await access.CanViewAsync(user, existing.ClientId, ct))
                 return Results.NotFound();
 
-            if (!await access.CanEditAsync(user, existing.ClientId, ct))
+            if (!await access.CanEditRecordAsync(user, existing.ClientId, existing.Id, ct))
                 return Results.Forbid();
 
             var (record, errors, error, notFound, conflict) = await forms.UpdateRecordAsync(
@@ -266,7 +266,7 @@ public static class FormEndpoints
             if (record is null)
                 return Results.NotFound();
 
-            if (!await access.CanEditAsync(user, record.ClientId, ct))
+            if (!await access.CanEditRecordAsync(user, record.ClientId, record.Id, ct))
                 return Results.Forbid();
 
             var title = record.Title;

@@ -21,6 +21,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Group> Groups => Set<Group>();
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<GroupGrant> GroupGrants => Set<GroupGrant>();
+    public DbSet<RecordGrant> RecordGrants => Set<RecordGrant>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<Document> Documents => Set<Document>();
@@ -142,6 +143,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique().HasDatabaseName("ux_group_members_group_user");
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_members_user");
+        });
+
+        modelBuilder.Entity<RecordGrant>(e =>
+        {
+            e.ToTable("record_grants");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.GroupId).HasColumnName("group_id");
+            e.Property(x => x.RecordId).HasColumnName("record_id");
+            e.Property(x => x.Actions).HasColumnName("actions").HasConversion<int>();
+            e.Property(x => x.GrantedAt).HasColumnName("granted_at");
+            e.Property(x => x.GrantedBy).HasColumnName("granted_by").HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.GroupId, x.RecordId }).IsUnique().HasDatabaseName("ux_record_grants_group_record");
+            e.HasOne<Group>().WithMany().HasForeignKey(x => x.GroupId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_record_grants_group");
+            e.HasOne<RecordInstance>().WithMany().HasForeignKey(x => x.RecordId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_record_grants_record");
         });
 
         modelBuilder.Entity<GroupGrant>(e =>

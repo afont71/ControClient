@@ -7,6 +7,10 @@
 <PageTitle>Grupos</PageTitle>
 
 <h1>Grupos</h1>
+<p class="muted">
+    Un grupo reúne personas y les da acceso a clientes. Marca en cada cliente qué puede
+    hacer el grupo; el «+» abre sus datos para dar permisos a una ficha concreta.
+</p>
 
 @if (_message is not null)
 {
@@ -21,48 +25,39 @@ else
 {
     <section>
         <h2>Nuevo grupo</h2>
-        <p>
-            <label>Nombre<br /><input @bind="_newName" /></label>
-            <label>Descripción<br /><input @bind="_newDescription" /></label>
-            <button @onclick="CreateAsync" disabled="@_busy">Crear grupo</button>
-        </p>
+        <div class="toolbar">
+            <label>Nombre<input @bind="_newName" placeholder="Soporte" /></label>
+            <label>Descripción<input @bind="_newDescription" placeholder="Equipo de soporte" /></label>
+            <button class="primary" @onclick="CreateAsync" disabled="@_busy">Crear grupo</button>
+        </div>
     </section>
 
     <section>
         <h2>Grupos</h2>
-        @if (_groups.Count == 0)
-        {
-            <p>Sin grupos todavía.</p>
-        }
-        else
-        {
-            <table>
-                <thead><tr><th>Nombre</th><th>Descripción</th><th>Miembros</th><th>Clientes</th><th></th></tr></thead>
-                <tbody>
-                    @foreach (var g in _groups)
-                    {
-                        <tr class="@(g.Id == _selectedId ? "selected" : "")">
-                            <td>@g.Name</td>
-                            <td>@(g.Description ?? "—")</td>
-                            <td>@g.Members</td>
-                            <td>@g.Clients</td>
-                            <td><button @onclick="() => SelectAsync(g.Id)">Gestionar</button></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
+        <table>
+            <thead><tr><th>Nombre</th><th>Descripción</th><th>Miembros</th><th>Clientes</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var g in _groups)
+                {
+                    <tr class="@(g.Id == _selectedId ? "selected" : "")">
+                        <td>@g.Name</td>
+                        <td>@(g.Description ?? "—")</td>
+                        <td>@g.Members</td>
+                        <td>@g.Clients</td>
+                        <td><button class="small" @onclick="() => SelectAsync(g.Id)">Gestionar</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </section>
 
     @if (_detail is not null)
     {
-        <section class="panel">
-            <h2>@_detail.Name</h2>
-
-            <h3>Miembros</h3>
+        <section>
+            <h2>@_detail.Name · miembros</h2>
             @if (_detail.Members.Count == 0)
             {
-                <p>Sin miembros.</p>
+                <p class="muted">Sin miembros.</p>
             }
             else
             {
@@ -74,64 +69,102 @@ else
                             <tr>
                                 <td>@m.Name</td>
                                 <td>@(m.Email ?? "—")</td>
-                                <td><button @onclick="() => RemoveMemberAsync(m.UserId)">Quitar</button></td>
+                                <td><button class="small danger" @onclick="() => RemoveMemberAsync(m.UserId)">Quitar</button></td>
                             </tr>
                         }
                     </tbody>
                 </table>
             }
 
-            <p>
-                <select @bind="_memberToAdd">
-                    <option value="">Añadir miembro…</option>
-                    @foreach (var u in _users)
-                    {
-                        <option value="@u.Id">@u.Name</option>
-                    }
-                </select>
-                <button @onclick="AddMemberAsync" disabled="@_busy">Añadir</button>
+            <div class="toolbar">
+                <label>Nuevo miembro
+                    <select @bind="_memberToAdd">
+                        <option value="">Selecciona…</option>
+                        @foreach (var u in _users)
+                        {
+                            <option value="@u.Id">@u.Name</option>
+                        }
+                    </select>
+                </label>
+                <button @onclick="AddMemberAsync" disabled="@_busy">Añadir miembro</button>
+            </div>
+        </section>
+
+        <section>
+            <h2>Clientes y permisos</h2>
+            <p class="muted">
+                Ver = consultar el cliente · Editar = modificar sus datos · Revelar = ver credenciales.
+                El «+» permite dar edición a una ficha concreta aunque el cliente sea de solo lectura.
             </p>
 
-            <h3>Clientes asignados</h3>
-            @if (_detail.Grants.Count == 0)
+            @if (_matrix.Count == 0)
             {
-                <p>Sin clientes asignados.</p>
+                <p>No hay clientes.</p>
             }
             else
             {
                 <table>
-                    <thead><tr><th>Cliente</th><th>Acciones</th><th></th></tr></thead>
+                    <thead>
+                        <tr><th>Cliente</th><th>Ver</th><th>Editar</th><th>Revelar</th><th>Datos</th></tr>
+                    </thead>
                     <tbody>
-                        @foreach (var g in _detail.Grants)
+                        @foreach (var row in _matrix)
                         {
+                            var canView = (row.Actions & (int)GrantActions.View) != 0;
+                            var canEdit = (row.Actions & (int)GrantActions.Edit) != 0;
+                            var canReveal = (row.Actions & (int)GrantActions.RevealSecret) != 0;
+                            var open = _openClients.Contains(row.ClientId);
+
                             <tr>
-                                <td>@g.ClientName</td>
-                                <td>@FormatActions(g.Actions)</td>
-                                <td><button @onclick="() => RevokeClientAsync(g.ClientId)">Revocar</button></td>
+                                <td>@row.ClientName</td>
+                                <td><input type="checkbox" checked="@canView" @onchange="e => SetClientAsync(row, GrantActions.View, e)" /></td>
+                                <td><input type="checkbox" checked="@canEdit" @onchange="e => SetClientAsync(row, GrantActions.Edit, e)" /></td>
+                                <td><input type="checkbox" checked="@canReveal" @onchange="e => SetClientAsync(row, GrantActions.RevealSecret, e)" /></td>
+                                <td>
+                                    <button class="small" @onclick="() => ToggleRecordsAsync(row.ClientId)">
+                                        @(open ? "−" : "+")
+                                    </button>
+                                </td>
                             </tr>
+
+                            @if (open)
+                            {
+                                <tr>
+                                    <td colspan="5" class="records-cell">
+                                        @if (!_recordsByClient.TryGetValue(row.ClientId, out var records))
+                                        {
+                                            <span class="muted">Cargando…</span>
+                                        }
+                                        else if (records.Count == 0)
+                                        {
+                                            <span class="muted">Este cliente no tiene fichas.</span>
+                                        }
+                                        else
+                                        {
+                                            <table class="inner">
+                                                <thead><tr><th>Ficha</th><th>Tipo</th><th>Permitir editar</th></tr></thead>
+                                                <tbody>
+                                                    @foreach (var r in records)
+                                                    {
+                                                        <tr>
+                                                            <td>@r.Title</td>
+                                                            <td>@r.TemplateName</td>
+                                                            <td>
+                                                                <input type="checkbox" checked="@r.Edit"
+                                                                       @onchange="e => SetRecordAsync(row.ClientId, r, e)" />
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        }
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
             }
-
-            <h3>Asignar clientes (masivo)</h3>
-            <div class="clients">
-                @foreach (var c in _clients)
-                {
-                    <label class="client">
-                        <input type="checkbox" checked="@_selectedClientIds.Contains(c.Id)"
-                               @onchange="e => ToggleClient(c.Id, e)" />
-                        @c.Name
-                    </label>
-                }
-            </div>
-
-            <p>
-                <label><input type="checkbox" @bind="_grantView" /> Ver</label>
-                <label><input type="checkbox" @bind="_grantEdit" /> Editar</label>
-                <label><input type="checkbox" @bind="_grantReveal" /> Revelar secretos</label>
-                <button @onclick="GrantAsync" disabled="@_busy">Asignar a los seleccionados</button>
-            </p>
         </section>
     }
 }
@@ -139,16 +172,14 @@ else
 @code {
     private IReadOnlyList<GroupsPageService.GroupRow>? _groups;
     private GroupsPageService.GroupDetail? _detail;
+    private IReadOnlyList<GroupsPageService.ClientPermissionRow> _matrix = [];
     private IReadOnlyList<(Guid Id, string Name)> _users = [];
-    private IReadOnlyList<(Guid Id, string Name)> _clients = [];
-    private readonly HashSet<Guid> _selectedClientIds = [];
+    private readonly Dictionary<Guid, IReadOnlyList<GroupsPageService.RecordPermissionRow>> _recordsByClient = [];
+    private readonly HashSet<Guid> _openClients = [];
     private Guid? _selectedId;
     private string? _newName;
     private string? _newDescription;
     private string _memberToAdd = string.Empty;
-    private bool _grantView = true;
-    private bool _grantEdit;
-    private bool _grantReveal;
     private string? _message;
     private bool _isError;
     private bool _busy;
@@ -162,7 +193,6 @@ else
             return;
 
         _users = await Servicio.UsersAsync();
-        _clients = await Servicio.ClientsAsync();
     }
 
     private async Task CreateAsync()
@@ -189,6 +219,9 @@ else
     {
         _selectedId = id;
         _detail = await Servicio.DetailAsync(id);
+        _openClients.Clear();
+        _recordsByClient.Clear();
+        _matrix = _detail is null ? [] : await Servicio.ClientsMatrixAsync(id);
     }
 
     private async Task AddMemberAsync()
@@ -213,43 +246,52 @@ else
         await SelectAsync(_detail.Id);
     }
 
-    private void ToggleClient(Guid clientId, ChangeEventArgs args)
-    {
-        if (args.Value is bool on && on) _selectedClientIds.Add(clientId);
-        else _selectedClientIds.Remove(clientId);
-    }
-
-    private async Task GrantAsync()
+    private async Task SetClientAsync(GroupsPageService.ClientPermissionRow row, GrantActions action, ChangeEventArgs args)
     {
         if (_detail is null) return;
 
-        var actions = GrantActions.None;
-        if (_grantView) actions |= GrantActions.View;
-        if (_grantEdit) actions |= GrantActions.Edit;
-        if (_grantReveal) actions |= GrantActions.RevealSecret;
+        var actions = row.Actions;
+        if (args.Value is bool on && on) actions |= (int)action;
+        else actions &= ~(int)action;
 
-        var (updated, error) = await Servicio.GrantClientsAsync(_detail.Id, _selectedClientIds.ToList(), actions);
-        SetMessage(error is null ? $"{updated} cliente(s) asignados." : error, error is not null);
-        if (error is null) _selectedClientIds.Clear();
-        await SelectAsync(_detail.Id);
+        var (ok, error) = await Servicio.SetClientActionsAsync(_detail.Id, row.ClientId, actions);
+        if (!ok)
+        {
+            SetMessage(error ?? "No se pudo guardar.", true);
+            return;
+        }
+
+        SetMessage("Permisos del cliente actualizados.", false);
+        _matrix = await Servicio.ClientsMatrixAsync(_detail.Id);
     }
 
-    private async Task RevokeClientAsync(Guid clientId)
+    private async Task ToggleRecordsAsync(Guid clientId)
+    {
+        if (_openClients.Remove(clientId))
+        {
+            _recordsByClient.Remove(clientId);
+            return;
+        }
+
+        _openClients.Add(clientId);
+        if (_detail is not null)
+            _recordsByClient[clientId] = await Servicio.RecordsAsync(_detail.Id, clientId);
+    }
+
+    private async Task SetRecordAsync(Guid clientId, GroupsPageService.RecordPermissionRow record, ChangeEventArgs args)
     {
         if (_detail is null) return;
-        var (ok, error) = await Servicio.RevokeClientAsync(_detail.Id, clientId);
-        SetMessage(ok ? "Cliente revocado." : error ?? "No se pudo revocar.", !ok);
-        await SelectAsync(_detail.Id);
-    }
 
-    private static string FormatActions(int actions)
-    {
-        var value = (GrantActions)actions;
-        var parts = new List<string>();
-        if ((value & GrantActions.View) != 0) parts.Add("Ver");
-        if ((value & GrantActions.Edit) != 0) parts.Add("Editar");
-        if ((value & GrantActions.RevealSecret) != 0) parts.Add("Revelar");
-        return parts.Count == 0 ? "—" : string.Join(", ", parts);
+        var edit = args.Value is bool on && on;
+        var (ok, error) = await Servicio.SetRecordEditAsync(_detail.Id, record.RecordId, edit);
+        if (!ok)
+        {
+            SetMessage(error ?? "No se pudo guardar.", true);
+            return;
+        }
+
+        SetMessage(edit ? "Ficha habilitada para editar." : "Permiso de ficha retirado.", false);
+        _recordsByClient[clientId] = await Servicio.RecordsAsync(_detail.Id, clientId);
     }
 
     private void SetMessage(string text, bool error)

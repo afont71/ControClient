@@ -17,4 +17,10 @@ public interface IClientAccessService
     Task<bool> CanEditAsync(AppUser user, Guid clientId, CancellationToken ct = default);
 
     Task<bool> CanRevealAsync(AppUser user, Guid clientId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edición de una ficha concreta: la del cliente o, si el cliente es de solo
+    /// lectura, la concedida al grupo sobre esa ficha.
+    /// </summary>
+    Task<bool> CanEditRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default);
 }
