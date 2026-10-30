@@ -1,4 +1,4 @@
-using ControClient.Domain.Abstractions;
+﻿using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Security;
 using ControClient.Domain.Users;
@@ -23,7 +23,8 @@ public sealed class RolePermissionsPageService(IServiceScopeFactory scopes, Auth
             return null;
 
         var rows = await db.RoleVaultPermissions.AsNoTracking().ToListAsync();
-        return Enum.GetValues<AppRole>()
+        return Ui.AssignableRoles
+            .Select(name => Enum.Parse<AppRole>(name))
             .Select(role => new RoleRow(
                 role,
                 Ui.RoleLabel(role.ToString()),

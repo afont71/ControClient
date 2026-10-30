@@ -3,6 +3,17 @@
 /// <summary>Etiquetas y estilos de presentación compartidos por las pantallas.</summary>
 public static class Ui
 {
+    /// <summary>Roles que se pueden asignar desde la interfaz (los técnicos de migración quedan fuera).</summary>
+    public static IReadOnlyList<string> AssignableRoles { get; } =
+    [
+        nameof(ControClient.Domain.Users.AppRole.Administrator),
+        nameof(ControClient.Domain.Users.AppRole.ClientManager),
+        nameof(ControClient.Domain.Users.AppRole.Technician),
+        nameof(ControClient.Domain.Users.AppRole.Auditor),
+        nameof(ControClient.Domain.Users.AppRole.ReadOnly),
+        nameof(ControClient.Domain.Users.AppRole.VaultCustodian)
+    ];
+
     public static string StatusLabel(string? status) => status switch
     {
         "Active" => "Activo",

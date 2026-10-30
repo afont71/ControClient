@@ -30,7 +30,7 @@ else
             <label>Nombre<br /><input @bind="_newName" /></label>
             <label>Perfil<br />
                 <select @bind="_newRole">
-                    @foreach (var role in Enum.GetNames<AppRole>())
+                    @foreach (var role in Ui.AssignableRoles)
                     {
                         <option value="@role">@Ui.RoleLabel(role)</option>
                     }
@@ -88,7 +88,7 @@ else
                     <td>@(u.Email ?? "—")</td>
                     <td>
                         <select value="@u.Role" @onchange="e => SetRoleAsync(u.Id, e.Value?.ToString())">
-                            @foreach (var role in Enum.GetNames<AppRole>())
+                            @foreach (var role in Ui.AssignableRoles)
                             {
                                 <option value="@role" selected="@(role == u.Role)">@Ui.RoleLabel(role)</option>
                             }
