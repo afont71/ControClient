@@ -65,7 +65,7 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
 
     public async Task<bool> CanRevealAsync(AppUser user, Guid clientId, CancellationToken ct = default)
     {
-        if (!policy.CanRevealSecretsByRole(user))
+        if (!await HasVaultPermissionAsync(user, VaultPermissions.Reveal, ct))
             return false;
 
         var actions = await GetEffectiveActionsAsync(user.Id, clientId, ct);
@@ -74,7 +74,7 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
 
     public async Task<bool> CanManageSecrecyAsync(AppUser user, Guid clientId, CancellationToken ct = default)
     {
-        if (!user.IsActive || !policy.CanManageSecrecy(user))
+        if (!user.IsActive || !await HasVaultPermissionAsync(user, VaultPermissions.ManageSecrets, ct))
             return false;
 
         return await CanViewAsync(user, clientId, ct);
@@ -140,6 +140,27 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
             return (overrides.Value & GrantActions.Edit) == GrantActions.Edit;
 
         return await CanEditAsync(user, clientId, ct);
+    }
+
+    /// <summary>
+    /// Permiso de bóveda configurado para el rol. Si no hay configuración, se
+    /// mantiene el comportamiento histórico de la política.
+    /// </summary>
+    private async Task<bool> HasVaultPermissionAsync(AppUser user, string permission, CancellationToken ct)
+    {
+        var configured = await db.RoleVaultPermissions.AsNoTracking()
+            .Select(p => new { p.Role, p.Permission })
+            .ToListAsync(ct);
+
+        // Solo se usa la política histórica si no hay ninguna configuración.
+        if (configured.Count == 0)
+        {
+            return permission == VaultPermissions.Reveal
+                ? policy.CanRevealSecretsByRole(user)
+                : policy.CanManageSecrecy(user);
+        }
+
+        return configured.Any(p => p.Role == user.Role && p.Permission == permission);
     }
 
     /// <summary>Unión de concesiones directas vigentes y de grupo (grupo activo).</summary>

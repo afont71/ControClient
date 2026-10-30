@@ -1,5 +1,7 @@
 ﻿using System.Security.Cryptography;
 using ControClient.Domain.Vault;
+using ControClient.Domain.Users;
+using ControClient.Domain.Security;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +26,20 @@ public sealed class VaultService(
     public bool IsInitialized => File.Exists(KeyFilePath);
 
     public bool IsUnsealed => ring.IsUnsealed;
+
+    /// <summary>Gestionar la bóveda (constituir, desellar, sellar, recuperar) según el rol.</summary>
+    public async Task<bool> CanManageAsync(AppRole role, CancellationToken ct = default)
+    {
+        var configured = await db.RoleVaultPermissions.AsNoTracking()
+            .Select(p => new { p.Role, p.Permission })
+            .ToListAsync(ct);
+
+        if (configured.Count == 0)
+            return role == AppRole.Administrator;
+
+        return configured.Any(p => p.Role == role
+            && p.Permission == ControClient.Domain.Security.VaultPermissions.Manage);
+    }
 
     private string KeyFilePath
     {

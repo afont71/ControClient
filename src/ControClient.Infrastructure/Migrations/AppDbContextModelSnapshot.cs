@@ -704,6 +704,31 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("record_grants", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Security.RoleVaultPermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("permission");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer")
+                        .HasColumnName("role");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Role", "Permission")
+                        .IsUnique()
+                        .HasDatabaseName("ux_role_vault_permissions_role_permission");
+
+                    b.ToTable("role_vault_permissions", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Users.AppUser", b =>
                 {
                     b.Property<Guid>("Id")

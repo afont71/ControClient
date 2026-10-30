@@ -50,7 +50,7 @@ public static class VaultEndpoints
             if (user is null)
                 return Results.Unauthorized();
 
-            if (!user.IsIn(AppRole.Administrator))
+            if (!await vault.CanManageAsync(user.Role, ct))
                 return Results.Forbid();
 
             try
@@ -92,7 +92,7 @@ public static class VaultEndpoints
             if (user is null)
                 return Results.Unauthorized();
 
-            if (!user.IsIn(AppRole.Administrator))
+            if (!await vault.CanManageAsync(user.Role, ct))
                 return Results.Forbid();
 
             try
@@ -124,13 +124,14 @@ public static class VaultEndpoints
             IUserProvisioner provisioner,
             VaultService vault,
             IAuditWriter audit,
-            IHttpContextAccessor http) =>
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
         {
             var user = await UserResolver.ResolveAsync(principal, provisioner);
             if (user is null)
                 return Results.Unauthorized();
 
-            if (!user.IsIn(AppRole.Administrator))
+            if (!await vault.CanManageAsync(user.Role, ct))
                 return Results.Forbid();
 
             vault.Lock();
@@ -159,7 +160,7 @@ public static class VaultEndpoints
             if (user is null)
                 return Results.Unauthorized();
 
-            if (!user.IsIn(AppRole.Administrator))
+            if (!await vault.CanManageAsync(user.Role, ct))
                 return Results.Forbid();
 
             try

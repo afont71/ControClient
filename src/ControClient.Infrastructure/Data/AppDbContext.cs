@@ -3,6 +3,7 @@ using ControClient.Domain.Clients;
 using ControClient.Domain.Documents;
 using ControClient.Domain.Forms;
 using ControClient.Domain.Groups;
+using ControClient.Domain.Security;
 using ControClient.Domain.Users;
 using ControClient.Domain.Vault;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<RecordGrant> RecordGrants => Set<RecordGrant>();
     public DbSet<RecordSecret> RecordSecrets => Set<RecordSecret>();
     public DbSet<RecordSecretFlag> RecordSecretFlags => Set<RecordSecretFlag>();
+    public DbSet<RoleVaultPermission> RoleVaultPermissions => Set<RoleVaultPermission>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<Document> Documents => Set<Document>();
@@ -145,6 +147,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(x => new { x.GroupId, x.UserId }).IsUnique().HasDatabaseName("ux_group_members_group_user");
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_members_user");
+        });
+
+        modelBuilder.Entity<RoleVaultPermission>(e =>
+        {
+            e.ToTable("role_vault_permissions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.Role).HasColumnName("role").HasConversion<int>();
+            e.Property(x => x.Permission).HasColumnName("permission").HasMaxLength(60).IsRequired();
+            e.HasIndex(x => new { x.Role, x.Permission }).IsUnique().HasDatabaseName("ux_role_vault_permissions_role_permission");
         });
 
         modelBuilder.Entity<RecordSecretFlag>(e =>

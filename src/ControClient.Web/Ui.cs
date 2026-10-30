@@ -1,4 +1,4 @@
-namespace ControClient.Web;
+﻿namespace ControClient.Web;
 
 /// <summary>Etiquetas y estilos de presentación compartidos por las pantallas.</summary>
 public static class Ui
@@ -29,6 +29,8 @@ public static class Ui
         "Auditor" => "Auditor",
         "ReadOnly" => "Solo lectura",
         "VaultCustodian" => "Custodio de bóveda",
+        "MigrationOperator" => "Operador de migración",
+        "Acceptance" => "Aceptación",
         _ => role ?? "—"
     };
 }

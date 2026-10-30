@@ -1,0 +1,86 @@
+@page "/roles"
+@using Microsoft.AspNetCore.Authorization
+@using ControClient.Domain.Security
+@using ControClient.Domain.Users
+@attribute [Authorize]
+@inject RolePermissionsPageService Servicio
+
+<PageTitle>Permisos de bóveda</PageTitle>
+
+<h1>Permisos de bóveda</h1>
+<p class="muted">
+    Estos permisos son <strong>de bóveda</strong> y se suman a los permisos sobre clientes.
+    Un usuario necesita el permiso de bóveda y, además, el permiso del cliente o de la ficha.
+</p>
+
+@if (_message is not null)
+{
+    <p class="@(_isError ? "error" : "ok")">@_message</p>
+}
+
+@if (_roles is null)
+{
+    <p class="muted">Solo un administrador puede cambiar estos permisos.</p>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Rol</th>
+                @foreach (var permission in VaultPermissions.All)
+                {
+                    <th title="@permission.Help">@permission.Label</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var role in _roles)
+            {
+                <tr>
+                    <td>@role.Label</td>
+                    @foreach (var permission in VaultPermissions.All)
+                    {
+                        <td>
+                            <input type="checkbox" checked="@role.Permissions.Contains(permission.Key)"
+                                   @onchange="e => SetAsync(role.Role, permission.Key, e)" />
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <section>
+        <h2>Qué hace cada permiso</h2>
+        <ul>
+            @foreach (var permission in VaultPermissions.All)
+            {
+                <li><strong>@permission.Label</strong>: @permission.Help.</li>
+            }
+        </ul>
+        <p class="muted">
+            «Revelar» no basta por sí solo: hace falta la concesión del cliente o de la ficha.
+            «Gestionar la bóveda» incluye desellar, sellar, constituir y recuperar.
+        </p>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<RolePermissionsPageService.RoleRow>? _roles;
+    private string? _message;
+    private bool _isError;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _roles = await Servicio.ListAsync();
+
+    private async Task SetAsync(AppRole role, string permission, ChangeEventArgs args)
+    {
+        var enabled = args.Value is bool value && value;
+        var (ok, error) = await Servicio.SetAsync(role, permission, enabled);
+        _message = ok ? "Permiso actualizado." : error ?? "No se pudo guardar.";
+        _isError = !ok;
+        await LoadAsync();
+    }
+}

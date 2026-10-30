@@ -69,6 +69,7 @@ builder.Services.AddScoped<ControClient.Web.Pages.TemplatesPageService>();
  builder.Services.AddScoped<ControClient.Infrastructure.Expirations.ExpirationsService>();
 builder.Services.AddScoped<ControClient.Web.Pages.ExpirationsPageService>();
 builder.Services.AddScoped<ControClient.Web.NavService>();
+builder.Services.AddScoped<ControClient.Web.Pages.RolePermissionsPageService>();
 builder.Services.AddScoped<ControClient.Web.Security.VaultLockService>();
 
 var authenticationMode = builder.Configuration["Authentication:Mode"] ?? "Entra";
@@ -273,8 +274,9 @@ if (app.Environment.IsDevelopment())
 if (app.Configuration.GetValue("Seeding:DefaultTemplates", true))
 {
     using var seedScope = app.Services.CreateScope();
-    await ControClient.Infrastructure.Forms.DefaultTemplateSeeder.SeedAsync(
-        seedScope.ServiceProvider.GetRequiredService<ControClient.Infrastructure.Data.AppDbContext>());
+    var seedDb = seedScope.ServiceProvider.GetRequiredService<ControClient.Infrastructure.Data.AppDbContext>();
+    await ControClient.Infrastructure.Forms.DefaultTemplateSeeder.SeedAsync(seedDb);
+    await ControClient.Infrastructure.Security.VaultPermissionSeeder.SeedAsync(seedDb);
 }
 
 app.MapRazorComponents<App>()
