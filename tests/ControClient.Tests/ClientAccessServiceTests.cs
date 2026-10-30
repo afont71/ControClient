@@ -1,4 +1,4 @@
-using ControClient.Domain.Clients;
+﻿using ControClient.Domain.Clients;
 using ControClient.Domain.Security;
 using ControClient.Domain.Users;
 using ControClient.Infrastructure.Data;
@@ -101,7 +101,7 @@ public class ClientAccessServiceTests
     }
 
     [Fact]
-    public async Task Administrador_no_revela_aunque_tenga_concesion()
+    public async Task Administrador_revela_si_tiene_concesion()
     {
         await using var db = Db();
         var admin = User(AppRole.Administrator);
@@ -111,7 +111,7 @@ public class ClientAccessServiceTests
 
         var service = new ClientAccessService(db, new ClientAccessPolicy());
 
-        Assert.False(await service.CanRevealAsync(admin, ClientA));
+        Assert.True(await service.CanRevealAsync(admin, ClientA));
     }
 
     [Fact]

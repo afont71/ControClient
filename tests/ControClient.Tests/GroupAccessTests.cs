@@ -227,7 +227,7 @@ public class GroupAccessTests
     }
 
     [Fact]
-    public async Task Un_administrador_no_revela_por_pertenecer_a_un_grupo()
+    public async Task El_administrador_revela_si_la_concesion_lo_permite()
     {
         await using var db = Db();
         var admin = User(AppRole.Administrator);
@@ -245,8 +245,8 @@ public class GroupAccessTests
 
         var service = new ClientAccessService(db, new ClientAccessPolicy());
 
-        // La política de rol sigue mandando: administrador no revela secretos.
-        Assert.False(await service.CanRevealAsync(admin, client.Id));
+        // Revelar depende de la concesión, no del rol: si el grupo la tiene, puede.
+        Assert.True(await service.CanRevealAsync(admin, client.Id));
         Assert.True(await service.CanViewAsync(admin, client.Id));
     }
 }

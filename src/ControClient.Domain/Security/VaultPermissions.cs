@@ -6,13 +6,11 @@ namespace ControClient.Domain.Security;
 public static class VaultPermissions
 {
     public const string Manage = "vault.manage";        // constituir, desellar, sellar, recuperar
-    public const string Reveal = "vault.reveal";        // revelar secretos (con permiso de cliente/ficha)
     public const string ManageSecrets = "vault.secrets"; // marcar/desmarcar campos secretos
 
     public static readonly (string Key, string Label, string Help)[] All =
     [
         (Manage, "Gestionar la bóveda", "Constituir, desellar, sellar y recuperar"),
-        (Reveal, "Revelar secretos", "Ver el valor de un campo secreto (además del permiso de cliente o ficha)"),
         (ManageSecrets, "Marcar secretos", "Marcar o desmarcar campos como secretos")
     ];
 }

@@ -1,4 +1,4 @@
-@page "/roles"
+﻿@page "/roles"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Security
 @using ControClient.Domain.Users
@@ -60,7 +60,8 @@ else
             }
         </ul>
         <p class="muted">
-            «Revelar» no basta por sí solo: hace falta la concesión del cliente o de la ficha.
+            Estos permisos afectan solo a la bóveda. El permiso para <strong>revelar</strong>
+            no está aquí: se concede sobre el cliente o sobre una ficha concreta en <strong>Grupos</strong>.
             «Gestionar la bóveda» incluye desellar, sellar, constituir y recuperar.
         </p>
     </section>

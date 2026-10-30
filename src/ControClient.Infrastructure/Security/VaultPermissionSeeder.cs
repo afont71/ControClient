@@ -19,9 +19,7 @@ public static class VaultPermissionSeeder
         db.RoleVaultPermissions.AddRange(
             new RoleVaultPermission(AppRole.Administrator, VaultPermissions.Manage),
             new RoleVaultPermission(AppRole.Administrator, VaultPermissions.ManageSecrets),
-            new RoleVaultPermission(AppRole.VaultCustodian, VaultPermissions.Reveal),
-            new RoleVaultPermission(AppRole.VaultCustodian, VaultPermissions.ManageSecrets),
-            new RoleVaultPermission(AppRole.Technician, VaultPermissions.Reveal));
+            new RoleVaultPermission(AppRole.VaultCustodian, VaultPermissions.ManageSecrets));
 
         await db.SaveChangesAsync(ct);
     }

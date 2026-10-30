@@ -65,8 +65,8 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
 
     public async Task<bool> CanRevealAsync(AppUser user, Guid clientId, CancellationToken ct = default)
     {
-        if (!await HasVaultPermissionAsync(user, VaultPermissions.Reveal, ct))
-            return false;
+        // Revelar es un permiso de datos: lo decide la concesión del cliente o de
+        // la ficha, no el rol.
 
         var actions = await GetEffectiveActionsAsync(user.Id, clientId, ct);
         return (actions & GrantActions.RevealSecret) == GrantActions.RevealSecret;
@@ -155,9 +155,7 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         // Solo se usa la política histórica si no hay ninguna configuración.
         if (configured.Count == 0)
         {
-            return permission == VaultPermissions.Reveal
-                ? policy.CanRevealSecretsByRole(user)
-                : policy.CanManageSecrecy(user);
+            return policy.CanManageSecrecy(user);
         }
 
         return configured.Any(p => p.Role == user.Role && p.Permission == permission);
