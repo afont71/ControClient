@@ -1,4 +1,4 @@
-using ControClient.Domain.Auditing;
+﻿using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
 using ControClient.Domain.Documents;
 using ControClient.Domain.Forms;
@@ -40,6 +40,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(x => x.Status).HasColumnName("status").HasConversion<int>();
             e.Property(x => x.CreatedAt).HasColumnName("created_at");
             e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+
+            e.Property(x => x.TaxId).HasColumnName("tax_id").HasMaxLength(30);
+            e.Property(x => x.Address).HasColumnName("address").HasMaxLength(300);
+            e.Property(x => x.PostalCode).HasColumnName("postal_code").HasMaxLength(20);
+            e.Property(x => x.City).HasColumnName("city").HasMaxLength(120);
+            e.Property(x => x.Province).HasColumnName("province").HasMaxLength(120);
+            e.Property(x => x.Country).HasColumnName("country").HasMaxLength(120);
+            e.Property(x => x.ContactName).HasColumnName("contact_name").HasMaxLength(200);
+            e.Property(x => x.ContactRole).HasColumnName("contact_role").HasMaxLength(120);
+            e.Property(x => x.ContactEmail).HasColumnName("contact_email").HasMaxLength(200);
+            e.Property(x => x.ContactPhone).HasColumnName("contact_phone").HasMaxLength(40);
+            e.Property(x => x.ContactMobile).HasColumnName("contact_mobile").HasMaxLength(40);
+            e.Property(x => x.Website).HasColumnName("website").HasMaxLength(200);
+            e.Property(x => x.Notes).HasColumnName("notes").HasMaxLength(2000);
+
             e.HasIndex(x => x.Name).IsUnique().HasDatabaseName("ux_clients_name");
         });
 

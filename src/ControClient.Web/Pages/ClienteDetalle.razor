@@ -41,20 +41,43 @@ else
             <h2>Datos de la empresa</h2>
             <EditForm Model="_form" OnValidSubmit="SaveAsync">
                 <DataAnnotationsValidator />
-                <p>
-                    <label>Nombre<br /><InputText @bind-Value="_form.Name" /></label>
-                    <ValidationMessage For="() => _form.Name" />
-                </p>
-                <p>
-                    <label>Estado comercial<br />
+                <h3>Datos de la empresa</h3>
+                <div class="form-grid">
+                    <label>Nombre *<InputText @bind-Value="_form.Name" /><ValidationMessage For="() => _form.Name" /></label>
+                    <label>Alias<InputText @bind-Value="_form.Alias" /></label>
+                    <label>CIF / NIF<InputText @bind-Value="_form.TaxId" /></label>
+                    <label>Sitio web<InputText @bind-Value="_form.Website" placeholder="https://" /></label>
+                    <label>Estado comercial
                         <InputSelect @bind-Value="_form.Status">
                             @foreach (var status in Enum.GetNames<ClientStatus>())
                             {
-                                <option value="@status">@status</option>
+                                <option value="@status">@Ui.StatusLabel(status)</option>
                             }
                         </InputSelect>
                     </label>
-                </p>
+                </div>
+
+                <h3>Dirección</h3>
+                <div class="form-grid">
+                    <label class="wide-2">Dirección<InputText @bind-Value="_form.Address" placeholder="Calle y número" /></label>
+                    <label>Código postal<InputText @bind-Value="_form.PostalCode" /></label>
+                    <label>Ciudad<InputText @bind-Value="_form.City" /></label>
+                    <label>Provincia<InputText @bind-Value="_form.Province" /></label>
+                    <label>País<InputText @bind-Value="_form.Country" placeholder="España" /></label>
+                </div>
+
+                <h3>Persona de contacto</h3>
+                <div class="form-grid">
+                    <label>Nombre<InputText @bind-Value="_form.ContactName" /></label>
+                    <label>Cargo<InputText @bind-Value="_form.ContactRole" /></label>
+                    <label>Correo<InputText @bind-Value="_form.ContactEmail" InputMode="InputMode.email" /></label>
+                    <label>Teléfono<InputText @bind-Value="_form.ContactPhone" InputMode="InputMode.tel" /></label>
+                    <label>Móvil<InputText @bind-Value="_form.ContactMobile" InputMode="InputMode.tel" /></label>
+                </div>
+
+                <div class="form-grid">
+                    <label class="wide">Notas<InputTextArea @bind-Value="_form.Notes" rows="4" /></label>
+                </div>
                 <button type="submit" disabled="@_saving">@(_saving ? "Guardando…" : "Guardar")</button>
             </EditForm>
         </section>
@@ -190,6 +213,20 @@ else
         {
             _form.Name = _client.Name;
             _form.Status = _client.Status;
+            _form.Alias = _client.Alias;
+            _form.TaxId = _client.TaxId;
+            _form.Address = _client.Address;
+            _form.PostalCode = _client.PostalCode;
+            _form.City = _client.City;
+            _form.Province = _client.Province;
+            _form.Country = _client.Country;
+            _form.ContactName = _client.ContactName;
+            _form.ContactRole = _client.ContactRole;
+            _form.ContactEmail = _client.ContactEmail;
+            _form.ContactPhone = _client.ContactPhone;
+            _form.ContactMobile = _client.ContactMobile;
+            _form.Website = _client.Website;
+            _form.Notes = _client.Notes;
             _grants = await Clientes.GrantsAsync(Id);
             _users = await Clientes.UsersAsync();
             _records = await Fichas.RecordsAsync(Id);
@@ -208,7 +245,12 @@ else
         _message = null;
         try
         {
-            var (ok, error) = await Clientes.UpdateAsync(Id, _form.Name, _form.Status);
+            var details = new ClientDetails(
+                _form.Alias, _form.TaxId, _form.Address, _form.PostalCode, _form.City,
+                _form.Province, _form.Country, _form.ContactName, _form.ContactRole,
+                _form.ContactEmail, _form.ContactPhone, _form.ContactMobile, _form.Website, _form.Notes);
+
+            var (ok, error) = await Clientes.UpdateAsync(Id, _form.Name, _form.Status, details);
             SetMessage(ok ? "Cliente actualizado." : error ?? "No se pudo guardar.", !ok);
             if (ok) await OnParametersSetAsync();
         }
@@ -384,6 +426,20 @@ else
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "El nombre es obligatorio.")]
         public string Name { get; set; } = string.Empty;
         public string Status { get; set; } = nameof(ClientStatus.PendingValidation);
+        public string? Alias { get; set; }
+        public string? TaxId { get; set; }
+        public string? Address { get; set; }
+        public string? PostalCode { get; set; }
+        public string? City { get; set; }
+        public string? Province { get; set; }
+        public string? Country { get; set; }
+        public string? ContactName { get; set; }
+        public string? ContactRole { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? ContactPhone { get; set; }
+        public string? ContactMobile { get; set; }
+        public string? Website { get; set; }
+        public string? Notes { get; set; }
     }
 
     public sealed class GrantForm

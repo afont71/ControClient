@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Clients;
@@ -85,7 +85,28 @@ public static class ClientEndpoints
 
             var client = await db.Clients.AsNoTracking()
                 .Where(c => c.Id == id)
-                .Select(c => new { c.Id, c.Name, c.Alias, Status = c.Status.ToString(), c.CreatedAt, c.UpdatedAt })
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Name,
+                    c.Alias,
+                    Status = c.Status.ToString(),
+                    c.TaxId,
+                    c.Address,
+                    c.PostalCode,
+                    c.City,
+                    c.Province,
+                    c.Country,
+                    c.ContactName,
+                    c.ContactRole,
+                    c.ContactEmail,
+                    c.ContactPhone,
+                    c.ContactMobile,
+                    c.Website,
+                    c.Notes,
+                    c.CreatedAt,
+                    c.UpdatedAt
+                })
                 .FirstOrDefaultAsync(ct);
 
             return client is null ? Results.NotFound() : Results.Ok(client);
@@ -119,6 +140,10 @@ public static class ClientEndpoints
                 return Results.Conflict(new { error = "Ya existe un cliente con ese nombre." });
 
             var client = new Client(name, request.Alias);
+            client.UpdateDetails(new ClientDetails(
+                request.Alias, request.TaxId, request.Address, request.PostalCode, request.City,
+                request.Province, request.Country, request.ContactName, request.ContactRole,
+                request.ContactEmail, request.ContactPhone, request.ContactMobile, request.Website, request.Notes));
             db.Clients.Add(client);
 
             // Quien crea el cliente conserva acceso si no es administrador global.
@@ -174,6 +199,22 @@ public static class ClientEndpoints
 
                 client.Rename(name);
             }
+
+            client.UpdateDetails(new ClientDetails(
+                request.Alias ?? client.Alias,
+                request.TaxId ?? client.TaxId,
+                request.Address ?? client.Address,
+                request.PostalCode ?? client.PostalCode,
+                request.City ?? client.City,
+                request.Province ?? client.Province,
+                request.Country ?? client.Country,
+                request.ContactName ?? client.ContactName,
+                request.ContactRole ?? client.ContactRole,
+                request.ContactEmail ?? client.ContactEmail,
+                request.ContactPhone ?? client.ContactPhone,
+                request.ContactMobile ?? client.ContactMobile,
+                request.Website ?? client.Website,
+                request.Notes ?? client.Notes));
 
             if (!string.IsNullOrWhiteSpace(request.Status)
                 && Enum.TryParse<ClientStatus>(request.Status, ignoreCase: true, out var status))
@@ -345,9 +386,40 @@ public static class ClientEndpoints
     private static string Correlation(IHttpContextAccessor http) =>
         http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N");
 
-    public sealed record CreateClientRequest(string Name, string? Alias);
+    public sealed record CreateClientRequest(
+        string Name,
+        string? Alias = null,
+        string? TaxId = null,
+        string? Address = null,
+        string? PostalCode = null,
+        string? City = null,
+        string? Province = null,
+        string? Country = null,
+        string? ContactName = null,
+        string? ContactRole = null,
+        string? ContactEmail = null,
+        string? ContactPhone = null,
+        string? ContactMobile = null,
+        string? Website = null,
+        string? Notes = null);
 
-    public sealed record UpdateClientRequest(string? Name, string? Status);
+    public sealed record UpdateClientRequest(
+        string? Name = null,
+        string? Status = null,
+        string? Alias = null,
+        string? TaxId = null,
+        string? Address = null,
+        string? PostalCode = null,
+        string? City = null,
+        string? Province = null,
+        string? Country = null,
+        string? ContactName = null,
+        string? ContactRole = null,
+        string? ContactEmail = null,
+        string? ContactPhone = null,
+        string? ContactMobile = null,
+        string? Website = null,
+        string? Notes = null);
 
     public sealed record CreateGrantRequest(Guid UserId, int Actions, DateTimeOffset? ExpiresAt);
 }

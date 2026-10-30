@@ -399,13 +399,21 @@ tr.selected { background: var(--primary-soft) !important; }
 
 .form-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 1.1rem 1.5rem;
     margin: 1rem 0;
 }
 
 .field { display: flex; flex-direction: column; gap: .3rem; }
 .field.wide { grid-column: 1 / -1; }
+.form-grid > label { display: flex; flex-direction: column; gap: .3rem; }
+.form-grid input:not([type=checkbox]):not([type=radio]),
+.form-grid select,
+.form-grid textarea { width: 100%; }
+.form-grid textarea { min-height: 6rem; }
+.form-grid .wide { grid-column: 1 / -1; }
+.form-grid .wide-2 { grid-column: span 2; }
+.form-grid > label.wide { grid-column: 1 / -1; }
 .field label { display: flex; flex-direction: column; gap: .3rem; }
 .field input:not([type=checkbox]):not([type=radio]),
 .field select,

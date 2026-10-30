@@ -17,7 +17,16 @@ namespace ControClient.Web.Pages;
 public sealed class ClientPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
     public sealed record ClientRow(Guid Id, string Name, string? Alias, string Status, DateTimeOffset CreatedAt);
-    public sealed record ClientDetail(Guid Id, string Name, string? Alias, string Status, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, bool CanEdit);
+    public sealed record ClientDetail(
+        Guid Id, string Name, string? Alias, string Status,
+        string? TaxId, string? Address, string? PostalCode, string? City, string? Province, string? Country,
+        string? ContactName, string? ContactRole, string? ContactEmail, string? ContactPhone, string? ContactMobile,
+        string? Website, string? Notes,
+        DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, bool CanEdit)
+    {
+        public ClientDetails Details => new(Alias, TaxId, Address, PostalCode, City, Province, Country,
+            ContactName, ContactRole, ContactEmail, ContactPhone, ContactMobile, Website, Notes);
+    }
     public sealed record GrantRow(Guid Id, Guid UserId, string UserName, string Actions, DateTimeOffset GrantedAt, DateTimeOffset? ExpiresAt);
     public sealed record UserRow(Guid Id, string Name, string Role, bool IsActive);
 
@@ -65,11 +74,16 @@ public sealed class ClientPageService(IServiceScopeFactory scopes, Authenticatio
         var canEdit = await access.CanEditAsync(user, id);
         return await db.Clients.AsNoTracking()
             .Where(c => c.Id == id)
-            .Select(c => new ClientDetail(c.Id, c.Name, c.Alias, c.Status.ToString(), c.CreatedAt, c.UpdatedAt, canEdit))
+            .Select(c => new ClientDetail(
+                c.Id, c.Name, c.Alias, c.Status.ToString(),
+                c.TaxId, c.Address, c.PostalCode, c.City, c.Province, c.Country,
+                c.ContactName, c.ContactRole, c.ContactEmail, c.ContactPhone, c.ContactMobile,
+                c.Website, c.Notes,
+                c.CreatedAt, c.UpdatedAt, canEdit))
             .FirstOrDefaultAsync();
     }
 
-    public async Task<(bool Ok, string? Error)> CreateAsync(string name, string? alias)
+    public async Task<(bool Ok, string? Error)> CreateAsync(string name, ClientDetails details)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -87,7 +101,8 @@ public sealed class ClientPageService(IServiceScopeFactory scopes, Authenticatio
         if (await db.Clients.AnyAsync(c => c.Name == clean))
             return (false, "Ya existe un cliente con ese nombre.");
 
-        var client = new Client(clean, alias);
+        var client = new Client(clean, details.Alias);
+        client.UpdateDetails(details);
         db.Clients.Add(client);
 
         if (!user.IsIn(AppRole.Administrator))
@@ -99,7 +114,7 @@ public sealed class ClientPageService(IServiceScopeFactory scopes, Authenticatio
         return (true, null);
     }
 
-    public async Task<(bool Ok, string? Error)> UpdateAsync(Guid id, string? name, string? status)
+    public async Task<(bool Ok, string? Error)> UpdateAsync(Guid id, string? name, string? status, ClientDetails details)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -121,6 +136,8 @@ public sealed class ClientPageService(IServiceScopeFactory scopes, Authenticatio
                 return (false, "Ya existe otro cliente con ese nombre.");
             client.Rename(clean);
         }
+
+        client.UpdateDetails(details);
 
         if (!string.IsNullOrWhiteSpace(status)
             && Enum.TryParse<ClientStatus>(status, ignoreCase: true, out var parsed))
