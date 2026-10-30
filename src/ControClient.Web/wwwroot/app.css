@@ -422,6 +422,12 @@ tr.selected { background: var(--primary-soft) !important; }
     border-top: 1px solid var(--border);
 }
 
+/* Acciones dentro de celdas: sin pegotes ni solapes */
+.row-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+td > a + button,
+td > button + button { margin-left: .65rem; }
+td > a + a { margin-left: .25rem; }
+
 /* ---------- Varios ---------- */
 
 .crumbs { font-size: .82rem; color: var(--muted); margin-bottom: .35rem; }

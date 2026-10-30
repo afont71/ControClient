@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
 using ControClient.Domain.Documents;
@@ -186,6 +186,7 @@ public static class DocumentEndpoints
         group.MapGet("/documents/{id:guid}/content", async (
             Guid id,
             int? version,
+            bool? inline,
             ClaimsPrincipal principal,
             IUserProvisioner provisioner,
             IClientAccessService access,
@@ -216,9 +217,51 @@ public static class DocumentEndpoints
                 clientId: document.ClientId,
                 reason: $"documento={id} version={version?.ToString() ?? "latest"}"), ct);
 
+            // «Ver» sirve el documento en el navegador solo para tipos seguros.
+            // Cualquier otro se sigue descargando aunque se pida inline.
+            var displayType = ResolveDisplayType(contentType, fileName);
+            var canDisplayInline = inline == true && IsSafeToDisplay(displayType);
+
+            if (canDisplayInline)
+            {
+                http.HttpContext!.Response.Headers.ContentDisposition = "inline";
+                return Results.File(stream, displayType!, enableRangeProcessing: true);
+            }
+
             return Results.File(stream, contentType ?? "application/octet-stream", fileName, enableRangeProcessing: true);
         });
 
         return app;
     }
+
+    /// <summary>
+    /// Tipo para mostrar: si el guardado es genérico, se deduce por la extensión.
+    /// </summary>
+    private static string? ResolveDisplayType(string? contentType, string? fileName)
+    {
+        if (contentType is not null && contentType != "application/octet-stream")
+            return contentType;
+
+        return Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            ".txt" or ".log" => "text/plain",
+            ".csv" => "text/csv",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".bmp" => "image/bmp",
+            _ => contentType
+        };
+    }
+
+    /// <summary>Solo estos tipos se muestran en el navegador; el resto se descarga.</summary>
+    private static bool IsSafeToDisplay(string? contentType) => contentType switch
+    {
+        "application/pdf" => true,
+        "image/png" or "image/jpeg" or "image/gif" or "image/webp" or "image/bmp" => true,
+        "text/plain" or "text/csv" or "text/log" => true,
+        _ => false
+    };
 }

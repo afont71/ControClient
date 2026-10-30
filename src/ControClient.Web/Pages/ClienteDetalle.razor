@@ -1,4 +1,4 @@
-﻿@page "/clientes/{Id:guid}"
+@page "/clientes/{Id:guid}"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
 @using ControClient.Domain.Documents
@@ -26,7 +26,7 @@ else
     <h1>@_client.Name</h1>
     <p><a class="button" href="@($"/datos/{Id}")">Ver y editar información del cliente</a> <a href="/clientes">Volver a clientes</a></p>
     <p class="muted">
-        Alias: @(_client.Alias ?? "—") · Estado: <strong>@_client.Status</strong> ·
+        Alias: @(_client.Alias ?? "—") · Estado: <span class="badge @Ui.StatusBadge(_client.Status)">@Ui.StatusLabel(_client.Status)</span> ·
         Creado: @_client.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")
     </p>
 
@@ -87,11 +87,14 @@ else
                             <td>@FormatSize(d.SizeBytes)</td>
                             <td>@d.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
                             <td>
-                                <a href="@($"/api/v1/documents/{d.Id}/content")">Descargar</a>
-                                @if (_client.CanEdit)
-                                {
-                                    <button @onclick="() => StartVersion(d.Id, d.Name)">Nueva versión</button>
-                                }
+                                <div class="row-actions">
+                                    <a href="@($"/api/v1/documents/{d.Id}/content?inline=true")" target="_blank" rel="noopener">Ver</a>
+                                    <a href="@($"/api/v1/documents/{d.Id}/content")">Descargar</a>
+                                    @if (_client.CanEdit)
+                                    {
+                                        <button class="small" @onclick="() => StartVersion(d.Id, d.Name)">Nueva versión</button>
+                                    }
+                                </div>
                             </td>
                         </tr>
                     }
