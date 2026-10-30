@@ -145,14 +145,49 @@ public class GroupAccessTests
 
         db.GroupMembers.Add(new GroupMember(group.Id, tech.Id, "admin"));
         db.GroupGrants.Add(new GroupGrant(group.Id, client.Id, GrantActions.View, "admin"));
-        db.RecordGrants.Add(new RecordGrant(group.Id, editable.Id, GrantActions.Edit, "admin"));
+        db.RecordGrants.Add(new RecordGrant(group.Id, editable.Id, GrantActions.View | GrantActions.Edit, "admin"));
         await db.SaveChangesAsync();
 
         var service = new ClientAccessService(db, new ClientAccessPolicy());
 
         Assert.False(await service.CanEditAsync(tech, client.Id));
+        Assert.True(await service.CanViewRecordAsync(tech, client.Id, editable.Id));
         Assert.True(await service.CanEditRecordAsync(tech, client.Id, editable.Id));
         Assert.False(await service.CanEditRecordAsync(tech, client.Id, otro.Id));
+    }
+
+    [Fact]
+    public async Task Una_ficha_sin_ver_retira_el_acceso_aunque_el_cliente_lo_tenga()
+    {
+        await using var db = Db();
+        var tech = User(AppRole.Technician);
+        var client = Client("Bodegas");
+        var group = new Group("Soporte", null, "admin");
+        var template = new FormTemplate("licencia", "Licencia", null,
+        [
+            new FieldDefinition("producto", "Producto", FieldType.Text, required: true, order: 1)
+        ], version: 1);
+
+        db.Users.Add(tech);
+        db.Clients.Add(client);
+        db.Groups.Add(group);
+        db.FormTemplates.Add(template);
+        await db.SaveChangesAsync();
+
+        var oculta = new RecordInstance(client.Id, template, "Oculta", "{\"producto\":\"X\"}", "admin");
+        db.Records.Add(oculta);
+
+        db.GroupMembers.Add(new GroupMember(group.Id, tech.Id, "admin"));
+        db.GroupGrants.Add(new GroupGrant(group.Id, client.Id,
+            GrantActions.View | GrantActions.Edit, "admin"));
+        db.RecordGrants.Add(new RecordGrant(group.Id, oculta.Id, GrantActions.None, "admin"));
+        await db.SaveChangesAsync();
+
+        var service = new ClientAccessService(db, new ClientAccessPolicy());
+
+        Assert.True(await service.CanEditAsync(tech, client.Id));
+        Assert.False(await service.CanViewRecordAsync(tech, client.Id, oculta.Id));
+        Assert.False(await service.CanEditRecordAsync(tech, client.Id, oculta.Id));
     }
 
     [Fact]

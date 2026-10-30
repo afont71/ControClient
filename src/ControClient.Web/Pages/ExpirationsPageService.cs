@@ -37,8 +37,16 @@ public sealed class ExpirationsPageService(
 
         var items = await expirations.GetAsync(visible, horizonDays);
 
-        return items.Select(i => new Row(
-            i.RecordId, i.ClientName, i.TemplateName, i.RecordTitle,
-            i.FieldLabel, i.Date, i.DaysLeft, i.WarningDays)).ToList();
+        var rows = new List<Row>();
+        foreach (var item in items)
+        {
+            if (!await access.CanViewRecordAsync(user, item.ClientId, item.RecordId))
+                continue;
+
+            rows.Add(new Row(item.RecordId, item.ClientName, item.TemplateName, item.RecordTitle,
+                item.FieldLabel, item.Date, item.DaysLeft, item.WarningDays));
+        }
+
+        return rows;
     }
 }

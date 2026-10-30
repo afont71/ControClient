@@ -35,11 +35,25 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             .ToList();
     }
 
-    public async Task<IReadOnlyList<RecordRow>> RecordsAsync(Guid clientId)    {
+    public async Task<IReadOnlyList<RecordRow>> RecordsAsync(Guid clientId)
+    {
         using var scope = scopes.CreateScope();
-        var forms = scope.ServiceProvider.GetRequiredService<FormService>();
+        var sp = scope.ServiceProvider;
+        var (user, access, forms) = await ResolveAsync(sp);
+        if (user is null)
+            return [];
+
         var list = await forms.ListRecordsAsync(clientId);
-        return list.Select(r => new RecordRow(r.Id, r.ClientId, r.TemplateId, r.TemplateName, r.Title, r.Version, r.CreatedAt, r.UpdatedAt)).ToList();
+        var visible = new List<RecordRow>();
+        foreach (var r in list)
+        {
+            if (!await access.CanViewRecordAsync(user, clientId, r.Id))
+                continue;
+
+            visible.Add(new RecordRow(r.Id, r.ClientId, r.TemplateId, r.TemplateName, r.Title, r.Version, r.CreatedAt, r.UpdatedAt));
+        }
+
+        return visible;
     }
 
     public async Task<IReadOnlyList<FieldInfo>> FieldsAsync(Guid templateId)
@@ -91,7 +105,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             return null;
 
         var record = await forms.GetRecordAsync(recordId);
-        if (record is null || !await access.CanViewAsync(user, record.ClientId))
+        if (record is null || !await access.CanViewRecordAsync(user, record.ClientId, record.Id))
             return null;
 
         var template = await forms.GetTemplateAsync(record.TemplateId);

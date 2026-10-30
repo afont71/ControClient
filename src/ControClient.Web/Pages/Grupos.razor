@@ -94,7 +94,9 @@ else
             <h2>Clientes y permisos</h2>
             <p class="muted">
                 Ver = consultar el cliente · Editar = modificar sus datos · Revelar = ver credenciales.
-                El «+» permite dar edición a una ficha concreta aunque el cliente sea de solo lectura.
+                La fila del cliente es el permiso general. El «+» abre sus fichas: allí los checks
+                mandan sobre el cliente, así que puedes quitar el ver a una ficha concreta. «Heredar»
+                elimina esa excepción y vuelve a los permisos del cliente.
             </p>
 
             @if (_matrix.Count == 0)
@@ -121,7 +123,7 @@ else
                                 <td><input type="checkbox" checked="@canEdit" @onchange="e => SetClientAsync(row, GrantActions.Edit, e)" /></td>
                                 <td><input type="checkbox" checked="@canReveal" @onchange="e => SetClientAsync(row, GrantActions.RevealSecret, e)" /></td>
                                 <td>
-                                    <button class="small" @onclick="() => ToggleRecordsAsync(row.ClientId)">
+                                    <button class="small" @onclick="() => ToggleRecordsAsync(row)">
                                         @(open ? "−" : "+")
                                     </button>
                                 </td>
@@ -142,16 +144,28 @@ else
                                         else
                                         {
                                             <table class="inner">
-                                                <thead><tr><th>Ficha</th><th>Tipo</th><th>Permitir editar</th></tr></thead>
+                                                <thead><tr><th>Ficha</th><th>Tipo</th><th>Ver</th><th>Editar</th><th></th></tr></thead>
                                                 <tbody>
                                                     @foreach (var r in records)
                                                     {
+                                                        var recView = (r.EffectiveActions & (int)GrantActions.View) != 0;
+                                                        var recEdit = (r.EffectiveActions & (int)GrantActions.Edit) != 0;
                                                         <tr>
                                                             <td>@r.Title</td>
                                                             <td>@r.TemplateName</td>
                                                             <td>
-                                                                <input type="checkbox" checked="@r.Edit"
-                                                                       @onchange="e => SetRecordAsync(row.ClientId, r, e)" />
+                                                                <input type="checkbox" checked="@recView"
+                                                                       @onchange="e => SetRecordAsync(row, r, GrantActions.View, e)" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="checkbox" checked="@recEdit"
+                                                                       @onchange="e => SetRecordAsync(row, r, GrantActions.Edit, e)" />
+                                                            </td>
+                                                            <td>
+                                                                @if (r.HasOverride)
+                                                                {
+                                                                    <button class="small" @onclick="() => RemoveOverrideAsync(row, r)">Heredar</button>
+                                                                }
                                                             </td>
                                                         </tr>
                                                     }
@@ -265,33 +279,55 @@ else
         _matrix = await Servicio.ClientsMatrixAsync(_detail.Id);
     }
 
-    private async Task ToggleRecordsAsync(Guid clientId)
+    private async Task ToggleRecordsAsync(GroupsPageService.ClientPermissionRow row)
     {
-        if (_openClients.Remove(clientId))
+        if (_openClients.Remove(row.ClientId))
         {
-            _recordsByClient.Remove(clientId);
+            _recordsByClient.Remove(row.ClientId);
             return;
         }
 
-        _openClients.Add(clientId);
+        _openClients.Add(row.ClientId);
         if (_detail is not null)
-            _recordsByClient[clientId] = await Servicio.RecordsAsync(_detail.Id, clientId);
+            _recordsByClient[row.ClientId] = await Servicio.RecordsAsync(_detail.Id, row.ClientId, row.Actions);
     }
 
-    private async Task SetRecordAsync(Guid clientId, GroupsPageService.RecordPermissionRow record, ChangeEventArgs args)
+    private async Task SetRecordAsync(
+        GroupsPageService.ClientPermissionRow row,
+        GroupsPageService.RecordPermissionRow record,
+        GrantActions action,
+        ChangeEventArgs args)
     {
         if (_detail is null) return;
 
-        var edit = args.Value is bool on && on;
-        var (ok, error) = await Servicio.SetRecordEditAsync(_detail.Id, record.RecordId, edit);
+        var actions = record.EffectiveActions;
+        if (args.Value is bool on && on) actions |= (int)action;
+        else actions &= ~(int)action;
+
+        var (ok, error) = await Servicio.SetRecordPermissionsAsync(_detail.Id, record.RecordId, actions);
         if (!ok)
         {
             SetMessage(error ?? "No se pudo guardar.", true);
             return;
         }
 
-        SetMessage(edit ? "Ficha habilitada para editar." : "Permiso de ficha retirado.", false);
-        _recordsByClient[clientId] = await Servicio.RecordsAsync(_detail.Id, clientId);
+        SetMessage("Permisos de la ficha actualizados.", false);
+        _recordsByClient[row.ClientId] = await Servicio.RecordsAsync(_detail.Id, row.ClientId, row.Actions);
+    }
+
+    private async Task RemoveOverrideAsync(GroupsPageService.ClientPermissionRow row, GroupsPageService.RecordPermissionRow record)
+    {
+        if (_detail is null) return;
+
+        var (ok, error) = await Servicio.RemoveRecordOverrideAsync(_detail.Id, record.RecordId);
+        if (!ok)
+        {
+            SetMessage(error ?? "No se pudo heredar.", true);
+            return;
+        }
+
+        SetMessage("La ficha vuelve a heredar los permisos del cliente.", false);
+        _recordsByClient[row.ClientId] = await Servicio.RecordsAsync(_detail.Id, row.ClientId, row.Actions);
     }
 
     private void SetMessage(string text, bool error)

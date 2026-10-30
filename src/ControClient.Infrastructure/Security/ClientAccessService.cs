@@ -72,21 +72,54 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         return (actions & GrantActions.RevealSecret) == GrantActions.RevealSecret;
     }
 
-    public async Task<bool> CanEditRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default)
+    /// <summary>
+    /// Permisos explícitos de la ficha para los grupos del usuario. Si hay alguno,
+    /// SUSTITUYE a los del cliente (permite incluso quitar el ver). Si no hay,
+    /// devuelve null y se hereda del cliente.
+    /// </summary>
+    private async Task<GrantActions?> GetRecordOverrideAsync(AppUser user, Guid recordId, CancellationToken ct)
+    {
+        var values = await (from rg in db.RecordGrants.AsNoTracking()
+                            join m in db.GroupMembers.AsNoTracking() on rg.GroupId equals m.GroupId
+                            join g in db.Groups.AsNoTracking() on rg.GroupId equals g.Id
+                            where m.UserId == user.Id && rg.RecordId == recordId && g.IsActive
+                            select (int)rg.Actions).ToListAsync(ct);
+
+        if (values.Count == 0)
+            return null;
+
+        var actions = GrantActions.None;
+        foreach (var value in values)
+            actions |= (GrantActions)value;
+
+        return actions;
+    }
+
+    public async Task<bool> CanViewRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default)
     {
         if (!user.IsActive)
             return false;
 
-        if (await CanEditAsync(user, clientId, ct))
+        if (!await CanViewAsync(user, clientId, ct))
+            return false;
+
+        var overrides = await GetRecordOverrideAsync(user, recordId, ct);
+        if (overrides is null)
             return true;
 
-        // Permiso puntual sobre una ficha, concedido a alguno de sus grupos.
-        return await (from rg in db.RecordGrants.AsNoTracking()
-                      join m in db.GroupMembers.AsNoTracking() on rg.GroupId equals m.GroupId
-                      join g in db.Groups.AsNoTracking() on rg.GroupId equals g.Id
-                      where m.UserId == user.Id && rg.RecordId == recordId && g.IsActive
-                            && (rg.Actions & GrantActions.Edit) == GrantActions.Edit
-                      select rg.Id).AnyAsync(ct);
+        return (overrides.Value & GrantActions.View) == GrantActions.View;
+    }
+
+    public async Task<bool> CanEditRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default)
+    {
+        if (!await CanViewRecordAsync(user, clientId, recordId, ct))
+            return false;
+
+        var overrides = await GetRecordOverrideAsync(user, recordId, ct);
+        if (overrides is not null)
+            return (overrides.Value & GrantActions.Edit) == GrantActions.Edit;
+
+        return await CanEditAsync(user, clientId, ct);
     }
 
     /// <summary>Unión de concesiones directas vigentes y de grupo (grupo activo).</summary>

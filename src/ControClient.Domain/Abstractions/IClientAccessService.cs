@@ -23,4 +23,7 @@ public interface IClientAccessService
     /// lectura, la concedida al grupo sobre esa ficha.
     /// </summary>
     Task<bool> CanEditRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default);
+
+    /// <summary>Ver una ficha concreta: la concesión de la ficha sustituye a la del cliente.</summary>
+    Task<bool> CanViewRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default);
 }

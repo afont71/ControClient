@@ -59,12 +59,22 @@ public sealed class InfoPageService(IServiceScopeFactory scopes, AuthenticationS
                 || x.ClientName.ToLower().Contains(term));
         }
 
-        return await query
+        var rows = await query
             .OrderBy(x => x.ClientName).ThenBy(x => x.TemplateName).ThenBy(x => x.r.Title)
             .Take(300)
             .Select(x => new InfoRow(x.r.Id, x.r.ClientId, x.ClientName, x.r.TemplateId, x.TemplateName,
                 x.r.Title, x.r.Version, x.r.UpdatedAt))
             .ToListAsync();
+
+        // Una ficha puede tener el ver retirado expresamente.
+        var visibleRows = new List<InfoRow>();
+        foreach (var row in rows)
+        {
+            if (await access.CanViewRecordAsync(user, row.ClientId, row.Id))
+                visibleRows.Add(row);
+        }
+
+        return visibleRows;
     }
 
     public async Task<IReadOnlyList<TemplateOption>> TemplatesAsync()

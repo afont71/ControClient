@@ -15,7 +15,7 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
 {
     public sealed record GroupRow(Guid Id, string Name, string? Description, bool IsActive, int Members, int Clients);
     public sealed record ClientPermissionRow(Guid ClientId, string ClientName, int Actions);
-    public sealed record RecordPermissionRow(Guid RecordId, string Title, string TemplateName, bool Edit);
+    public sealed record RecordPermissionRow(Guid RecordId, string Title, string TemplateName, bool HasOverride, int EffectiveActions);
     public sealed record MemberRow(Guid UserId, string Name, string? Email);
     public sealed record GrantRow(Guid ClientId, string ClientName, int Actions, DateTimeOffset? ExpiresAt);
     public sealed record GroupDetail(Guid Id, string Name, string? Description, IReadOnlyList<MemberRow> Members, IReadOnlyList<GrantRow> Grants);
@@ -133,7 +133,7 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
         return (true, null);
     }
 
-    public async Task<IReadOnlyList<RecordPermissionRow>> RecordsAsync(Guid groupId, Guid clientId)
+    public async Task<IReadOnlyList<RecordPermissionRow>> RecordsAsync(Guid groupId, Guid clientId, int clientActions)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -154,10 +154,11 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
 
         return records.Select(r => new RecordPermissionRow(
             r.Id, r.Title, r.Template,
-            (grants.GetValueOrDefault(r.Id, 0) & (int)GrantActions.Edit) == (int)GrantActions.Edit)).ToList();
+            grants.ContainsKey(r.Id),
+            grants.TryGetValue(r.Id, out var value) ? value : clientActions)).ToList();
     }
 
-    public async Task<(bool Ok, string? Error)> SetRecordEditAsync(Guid groupId, Guid recordId, bool edit)
+    public async Task<(bool Ok, string? Error)> SetRecordPermissionsAsync(Guid groupId, Guid recordId, int actions)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -169,26 +170,35 @@ public sealed class GroupsPageService(IServiceScopeFactory scopes, Authenticatio
             return (false, "La ficha no existe.");
 
         var grant = await db.RecordGrants.FirstOrDefaultAsync(g => g.GroupId == groupId && g.RecordId == recordId);
-
-        if (edit)
-        {
-            if (grant is null)
-                db.RecordGrants.Add(new RecordGrant(groupId, recordId, GrantActions.Edit, actor.DisplayName));
-            else if ((grant.Actions & GrantActions.Edit) == 0)
-                grant.ChangeActions(grant.Actions | GrantActions.Edit);
-        }
-        else if (grant is not null)
-        {
-            var rest = grant.Actions & ~GrantActions.Edit;
-            if (rest == GrantActions.None) db.RecordGrants.Remove(grant);
-            else grant.ChangeActions(rest);
-        }
+        if (grant is null)
+            db.RecordGrants.Add(new RecordGrant(groupId, recordId, (GrantActions)actions, actor.DisplayName));
+        else
+            grant.ChangeActions((GrantActions)actions);
 
         await db.SaveChangesAsync();
-        await AuditAsync(sp, actor, "groups.record_permission", null, $"grupo={groupId} ficha={recordId} editar={edit}");
+        await AuditAsync(sp, actor, "groups.record_permission", null,
+            $"grupo={groupId} ficha={recordId} acciones={(GrantActions)actions}");
         return (true, null);
     }
 
+    public async Task<(bool Ok, string? Error)> RemoveRecordOverrideAsync(Guid groupId, Guid recordId)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (actor, db) = await ResolveAsync(sp);
+        if (actor is null || !actor.IsIn(AppRole.Administrator))
+            return (false, "Solo un administrador puede gestionar grupos.");
+
+        var grant = await db.RecordGrants.FirstOrDefaultAsync(g => g.GroupId == groupId && g.RecordId == recordId);
+        if (grant is not null)
+        {
+            db.RecordGrants.Remove(grant);
+            await db.SaveChangesAsync();
+            await AuditAsync(sp, actor, "groups.record_permission", null, $"grupo={groupId} ficha={recordId} heredar=true");
+        }
+
+        return (true, null);
+    }
     public async Task<(bool Ok, string? Error)> AddMemberAsync(Guid groupId, Guid userId)
     {
         using var scope = scopes.CreateScope();

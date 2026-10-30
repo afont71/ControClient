@@ -1,4 +1,4 @@
-using ControClient.Domain.Clients;
+﻿using ControClient.Domain.Clients;
 
 namespace ControClient.Domain.Groups;
 
@@ -13,9 +13,6 @@ public sealed class RecordGrant
 
     public RecordGrant(Guid groupId, Guid recordId, GrantActions actions, string grantedBy)
     {
-        if (actions == GrantActions.None)
-            throw new ArgumentException("La concesión debe incluir al menos una acción.", nameof(actions));
-
         GroupId = groupId;
         RecordId = recordId;
         Actions = actions;
@@ -29,11 +26,5 @@ public sealed class RecordGrant
     public DateTimeOffset GrantedAt { get; private set; } = DateTimeOffset.UtcNow;
     public string GrantedBy { get; private set; } = string.Empty;
 
-    public void ChangeActions(GrantActions actions)
-    {
-        if (actions == GrantActions.None)
-            throw new ArgumentException("La concesión debe incluir al menos una acción.", nameof(actions));
-
-        Actions = actions;
-    }
+    public void ChangeActions(GrantActions actions) => Actions = actions;
 }

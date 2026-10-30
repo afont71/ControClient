@@ -100,7 +100,15 @@ public static class FormEndpoints
             if (!await access.CanViewAsync(user, clientId, ct))
                 return Results.NotFound();
 
-            return Results.Ok(await forms.ListRecordsAsync(clientId, templateId, ct));
+            var all = await forms.ListRecordsAsync(clientId, templateId, ct);
+            var visible = new List<ControClient.Infrastructure.Forms.FormService.RecordSummary>();
+            foreach (var r in all)
+            {
+                if (await access.CanViewRecordAsync(user, clientId, r.Id, ct))
+                    visible.Add(r);
+            }
+
+            return Results.Ok(visible);
         });
 
         group.MapPost("/clients/{clientId:guid}/records", async (
@@ -163,7 +171,7 @@ public static class FormEndpoints
             if (record is null)
                 return Results.NotFound();
 
-            if (!await access.CanViewAsync(user, record.ClientId, ct))
+            if (!await access.CanViewRecordAsync(user, record.ClientId, record.Id, ct))
                 return Results.NotFound();
 
             var template = await forms.GetTemplateAsync(record.TemplateId, ct);
@@ -215,7 +223,7 @@ public static class FormEndpoints
                 return Results.Unauthorized();
 
             var existing = await forms.GetRecordAsync(id, ct);
-            if (existing is null || !await access.CanViewAsync(user, existing.ClientId, ct))
+            if (existing is null || !await access.CanViewRecordAsync(user, existing.ClientId, existing.Id, ct))
                 return Results.NotFound();
 
             if (!await access.CanEditRecordAsync(user, existing.ClientId, existing.Id, ct))
