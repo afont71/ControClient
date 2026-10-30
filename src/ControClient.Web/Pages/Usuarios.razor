@@ -70,7 +70,7 @@ else
                         <select value="@u.Role" @onchange="e => SetRoleAsync(u.Id, e.Value?.ToString())">
                             @foreach (var role in Enum.GetNames<AppRole>())
                             {
-                                <option value="@role" selected="@(role == u.Role)">@role</option>
+                                <option value="@role" selected="@(role == u.Role)">@Ui.RoleLabel(role)</option>
                             }
                         </select>
                     </td>
