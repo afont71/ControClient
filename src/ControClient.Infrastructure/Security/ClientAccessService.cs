@@ -72,6 +72,18 @@ public sealed class ClientAccessService(AppDbContext db, IClientAccessPolicy pol
         return (actions & GrantActions.RevealSecret) == GrantActions.RevealSecret;
     }
 
+    public async Task<bool> CanRevealRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default)
+    {
+        if (!await CanViewRecordAsync(user, clientId, recordId, ct))
+            return false;
+
+        var overrides = await GetRecordOverrideAsync(user, recordId, ct);
+        if (overrides is not null)
+            return (overrides.Value & GrantActions.RevealSecret) == GrantActions.RevealSecret;
+
+        return await CanRevealAsync(user, clientId, ct);
+    }
+
     /// <summary>
     /// Permisos explícitos de la ficha para los grupos del usuario. Si hay alguno,
     /// SUSTITUYE a los del cliente (permite incluso quitar el ver). Si no hay,

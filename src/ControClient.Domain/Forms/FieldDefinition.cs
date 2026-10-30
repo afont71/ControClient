@@ -1,4 +1,4 @@
-namespace ControClient.Domain.Forms;
+﻿namespace ControClient.Domain.Forms;
 
 /// <summary>Tipos de campo soportados por las plantillas (§2.1 de la especificación).</summary>
 public enum FieldType
@@ -23,7 +23,7 @@ public sealed class FieldDefinition
 {
     private FieldDefinition() { }
 
-    public FieldDefinition(string key, string label, FieldType type, bool required = false, int order = 0, string? options = null, string? helpText = null)
+    public FieldDefinition(string key, string label, FieldType type, bool required = false, int order = 0, string? options = null, string? helpText = null, bool isSecret = false)
     {
         if (string.IsNullOrWhiteSpace(key) || !key.All(c => char.IsLetterOrDigit(c) || c is '_' or '-'))
             throw new ArgumentException("La clave del campo solo admite letras, números, guion y guion bajo.", nameof(key));
@@ -41,6 +41,7 @@ public sealed class FieldDefinition
         Order = order;
         OptionsJson = options;
         HelpText = helpText;
+        IsSecret = isSecret;
     }
 
     public Guid Id { get; private set; } = Guid.NewGuid();
@@ -54,4 +55,7 @@ public sealed class FieldDefinition
     public string? OptionsJson { get; private set; }
 
     public string? HelpText { get; private set; }
+
+    /// <summary>Valor cifrado con la clave de la bóveda; solo se revela con permiso.</summary>
+    public bool IsSecret { get; private set; }
 }

@@ -12,7 +12,7 @@ namespace ControClient.Web.Pages;
 public sealed class TemplatesPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
     public sealed record TemplateRow(Guid Id, string Key, string Name, string? Description, int Version, bool IsActive, int Fields);
-    public sealed record FieldDraft(string Key, string Label, string Type, bool Required, string? OptionsCsv);
+    public sealed record FieldDraft(string Key, string Label, string Type, bool Required, string? OptionsCsv, bool IsSecret = false);
 
     public async Task<IReadOnlyList<TemplateRow>?> ListAsync()
     {
@@ -46,7 +46,8 @@ public sealed class TemplatesPageService(IServiceScopeFactory scopes, Authentica
             f.Label,
             f.Type.ToString(),
             f.IsRequired,
-            f.OptionsJson is null ? null : string.Join(", ", JsonSerializer.Deserialize<string[]>(f.OptionsJson) ?? [])
+            f.OptionsJson is null ? null : string.Join(", ", JsonSerializer.Deserialize<string[]>(f.OptionsJson) ?? []),
+            f.IsSecret
         )).ToList();
     }
 
@@ -80,7 +81,8 @@ public sealed class TemplatesPageService(IServiceScopeFactory scopes, Authentica
                 f.Required,
                 ParseOptions(f.OptionsCsv),
                 null,
-                index + 1)).ToList();
+                index + 1,
+                f.IsSecret)).ToList();
 
             var template = await forms.CreateTemplateAsync(key, name, description, specs);
             return (template.Id, null);
@@ -130,7 +132,8 @@ public sealed class TemplatesPageService(IServiceScopeFactory scopes, Authentica
                 f.Required,
                 ParseOptions(f.OptionsCsv),
                 null,
-                index + 1)).ToList();
+                index + 1,
+                f.IsSecret)).ToList();
 
             var updated = await forms.CreateTemplateAsync(template.Key, name, description, specs);
             return (updated.Id, null);

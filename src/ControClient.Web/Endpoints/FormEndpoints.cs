@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text.Json;
 using ControClient.Domain.Abstractions;
 using ControClient.Domain.Auditing;
@@ -62,7 +62,8 @@ public static class FormEndpoints
                     f.Required,
                     f.Options is { Length: > 0 } ? JsonSerializer.Serialize(f.Options) : null,
                     f.HelpText,
-                    f.Order == 0 ? index + 1 : f.Order)).ToList();
+                    f.Order == 0 ? index + 1 : f.Order,
+                    f.IsSecret)).ToList();
 
                 var template = await forms.CreateTemplateAsync(request.Key, request.Name, request.Description, specs, ct);
 
@@ -133,7 +134,7 @@ public static class FormEndpoints
                 return Results.Forbid();
 
             var (record, errors, error) = await forms.CreateRecordAsync(
-                clientId, request.TemplateId, request.Title, request.Values, user.DisplayName, ct);
+                clientId, request.TemplateId, request.Title, request.Values, user.DisplayName, request.Secrets, ct: ct);
 
             if (errors is not null)
                 return Results.ValidationProblem(errors.ToDictionary(e => e.Key, e => e.Value));
@@ -230,7 +231,7 @@ public static class FormEndpoints
                 return Results.Forbid();
 
             var (record, errors, error, notFound, conflict) = await forms.UpdateRecordAsync(
-                id, request.Title, request.Values, request.Version, ct);
+                id, request.Title, request.Values, request.Version, request.Secrets, user.DisplayName, ct: ct);
 
             if (conflict)
                 return Results.Conflict(new { error });
@@ -293,11 +294,59 @@ public static class FormEndpoints
             return Results.NoContent();
         });
 
+        // Revelar un campo secreto: exige ver la ficha, permiso de revelar
+        // (el de la ficha manda sobre el del cliente) y la bóveda desellada.
+        group.MapPost("/records/{id:guid}/fields/{fieldKey}/reveal", async (
+            Guid id,
+            string fieldKey,
+            ClaimsPrincipal principal,
+            IUserProvisioner provisioner,
+            IClientAccessService access,
+            FormService forms,
+            IAuditWriter audit,
+            IHttpContextAccessor http,
+            CancellationToken ct) =>
+        {
+            var user = await UserResolver.ResolveAsync(principal, provisioner, ct);
+            if (user is null)
+                return Results.Unauthorized();
+
+            var record = await forms.GetRecordAsync(id, ct);
+            if (record is null)
+                return Results.NotFound();
+
+            if (!await access.CanRevealRecordAsync(user, record.ClientId, record.Id, ct))
+                return Results.Forbid();
+
+            try
+            {
+                var value = await forms.RevealSecretAsync(id, fieldKey, ct);
+                if (value is null)
+                    return Results.NotFound(new { error = "Ese campo no tiene valor guardado." });
+
+                await audit.WriteAsync(new AuditEvent(
+                    entity: "records",
+                    action: "records.reveal_field",
+                    actorName: user.DisplayName,
+                    actorObjectId: user.EntraObjectId,
+                    correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
+                    clientId: record.ClientId,
+                    reason: $"ficha={id} campo={fieldKey}"), ct);
+
+                return Results.Ok(new { value });
+            }
+            catch (ControClient.Infrastructure.Vault.VaultSealedException)
+            {
+                return Results.Json(new { error = "La bóveda está sellada." },
+                    statusCode: StatusCodes.Status423Locked);
+            }
+        });
+
         return app;
     }
 
     public sealed record CreateTemplateRequest(string Key, string Name, string? Description, List<FieldRequest> Fields);
-    public sealed record FieldRequest(string Key, string Label, string Type, bool Required = false, string[]? Options = null, string? HelpText = null, int Order = 0);
-    public sealed record CreateRecordRequest(Guid TemplateId, string Title, JsonElement Values);
-    public sealed record UpdateRecordRequest(string? Title, JsonElement Values, int Version);
+    public sealed record FieldRequest(string Key, string Label, string Type, bool Required = false, string[]? Options = null, string? HelpText = null, int Order = 0, bool IsSecret = false);
+    public sealed record CreateRecordRequest(Guid TemplateId, string Title, JsonElement Values, Dictionary<string, string>? Secrets = null);
+    public sealed record UpdateRecordRequest(string? Title, JsonElement Values, int Version, Dictionary<string, string>? Secrets = null);
 }

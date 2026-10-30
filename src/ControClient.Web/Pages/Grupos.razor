@@ -1,4 +1,4 @@
-﻿@page "/grupos"
+@page "/grupos"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Clients
 @attribute [Authorize]
@@ -144,12 +144,13 @@ else
                                         else
                                         {
                                             <table class="inner">
-                                                <thead><tr><th>Ficha</th><th>Tipo</th><th>Ver</th><th>Editar</th><th></th></tr></thead>
+                                                <thead><tr><th>Ficha</th><th>Tipo</th><th>Ver</th><th>Editar</th><th>Revelar</th><th></th></tr></thead>
                                                 <tbody>
                                                     @foreach (var r in records)
                                                     {
                                                         var recView = (r.EffectiveActions & (int)GrantActions.View) != 0;
                                                         var recEdit = (r.EffectiveActions & (int)GrantActions.Edit) != 0;
+                                                        var recReveal = (r.EffectiveActions & (int)GrantActions.RevealSecret) != 0;
                                                         <tr>
                                                             <td>@r.Title</td>
                                                             <td>@r.TemplateName</td>
@@ -160,6 +161,10 @@ else
                                                             <td>
                                                                 <input type="checkbox" checked="@recEdit"
                                                                        @onchange="e => SetRecordAsync(row, r, GrantActions.Edit, e)" />
+                                                            </td>
+                                                            <td>
+                                                                <input type="checkbox" checked="@recReveal"
+                                                                       @onchange="e => SetRecordAsync(row, r, GrantActions.RevealSecret, e)" />
                                                             </td>
                                                             <td>
                                                                 @if (r.HasOverride)

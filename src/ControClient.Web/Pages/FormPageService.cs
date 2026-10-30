@@ -16,9 +16,9 @@ namespace ControClient.Web.Pages;
 public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
     public sealed record TemplateRow(Guid Id, string Key, string Name, string? Description, int Version);
-    public sealed record FieldInfo(string Key, string Label, string Type, bool Required, string[] Options, string? HelpText);
+    public sealed record FieldInfo(string Key, string Label, string Type, bool Required, string[] Options, string? HelpText, bool IsSecret = false);
     public sealed record RecordRow(Guid Id, Guid ClientId, Guid TemplateId, string TemplateName, string Title, int Version, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt);
-    public sealed record RecordView(Guid Id, Guid ClientId, string Title, int Version, bool CanEdit, IReadOnlyList<FieldInfo> Fields, Dictionary<string, string?> Text, Dictionary<string, bool> Bools, Dictionary<string, List<string>> Multi, Dictionary<string, string[]> Errors);
+    public sealed record RecordView(Guid Id, Guid ClientId, string Title, int Version, bool CanEdit, bool CanReveal, IReadOnlyList<FieldInfo> Fields, Dictionary<string, string?> Text, Dictionary<string, bool> Bools, Dictionary<string, List<string>> Multi, Dictionary<string, string[]> Errors, IReadOnlyCollection<string> SecretKeys);
 
     public async Task<IReadOnlyList<TemplateRow>> TemplatesAsync()
     {
@@ -65,8 +65,36 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             return [];
 
         return template.Fields.OrderBy(f => f.Order)
-            .Select(f => new FieldInfo(f.Key, f.Label, f.Type.ToString(), f.IsRequired, ParseOptions(f.OptionsJson), f.HelpText))
+            .Select(f => new FieldInfo(f.Key, f.Label, f.Type.ToString(), f.IsRequired, ParseOptions(f.OptionsJson), f.HelpText, f.IsSecret))
             .ToList();
+    }
+
+    public async Task<(string? Value, string? Error)> RevealAsync(Guid recordId, string fieldKey)
+    {
+        using var scope = scopes.CreateScope();
+        var sp = scope.ServiceProvider;
+        var (user, access, forms) = await ResolveAsync(sp);
+        if (user is null)
+            return (null, "Sesión no válida.");
+
+        var record = await forms.GetRecordAsync(recordId);
+        if (record is null)
+            return (null, "La ficha no existe.");
+
+        if (!await access.CanRevealRecordAsync(user, record.ClientId, record.Id))
+            return (null, "No tienes permiso para revelar secretos de esta ficha.");
+
+        var value = await forms.RevealSecretAsync(recordId, fieldKey);
+        if (value is null)
+            return (null, "Ese campo no tiene valor guardado.");
+
+        var audit = sp.GetRequiredService<ControClient.Domain.Abstractions.IAuditWriter>();
+        await audit.WriteAsync(new ControClient.Domain.Auditing.AuditEvent(
+            entity: "records", action: "records.reveal_field", actorName: user.DisplayName,
+            actorObjectId: user.EntraObjectId, correlationId: Guid.NewGuid().ToString("N"),
+            clientId: record.ClientId, reason: $"ficha={recordId} campo={fieldKey}"));
+
+        return (value, null);
     }
 
     public async Task<(bool Ok, string? Error)> DeleteAsync(Guid recordId)
@@ -118,8 +146,11 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
         var multi = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         using var doc = JsonDocument.Parse(record.ValuesJson);
+        var canReveal = await access.CanRevealRecordAsync(user, record.ClientId, record.Id);
+        var secretKeys = await forms.SecretKeysAsync(record.Id);
+
         var fields = template.Fields.OrderBy(f => f.Order).Select(f => new FieldInfo(
-            f.Key, f.Label, f.Type.ToString(), f.IsRequired, ParseOptions(f.OptionsJson), f.HelpText)).ToList();
+            f.Key, f.Label, f.Type.ToString(), f.IsRequired, ParseOptions(f.OptionsJson), f.HelpText, f.IsSecret)).ToList();
 
         foreach (var field in fields)
         {
@@ -144,13 +175,14 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             }
         }
 
-        return new RecordView(record.Id, record.ClientId, record.Title, record.Version, canEdit, fields, text, bools, multi, []);
+        return new RecordView(record.Id, record.ClientId, record.Title, record.Version, canEdit, canReveal, fields, text, bools, multi, [], secretKeys);
     }
 
     public async Task<(Guid? RecordId, Dictionary<string, string[]>? Errors, string? Error)> CreateAsync(
         Guid clientId, Guid templateId, string title,
         IReadOnlyList<FieldInfo> fields,
-        Dictionary<string, string?> text, Dictionary<string, bool> bools, Dictionary<string, List<string>> multi)
+        Dictionary<string, string?> text, Dictionary<string, bool> bools, Dictionary<string, List<string>> multi,
+        IReadOnlyDictionary<string, string>? secrets = null)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -162,7 +194,7 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
             return (null, null, "No tienes permiso para añadir fichas a este cliente.");
 
         var json = BuildJson(fields, text, bools, multi);
-        var (record, errors, error) = await forms.CreateRecordAsync(clientId, templateId, title, JsonDocument.Parse(json).RootElement, user.DisplayName);
+        var (record, errors, error) = await forms.CreateRecordAsync(clientId, templateId, title, JsonDocument.Parse(json).RootElement, user.DisplayName, secrets);
 
         if (errors is not null)
             return (null, errors.ToDictionary(e => e.Key, e => e.Value), null);
@@ -177,7 +209,8 @@ public sealed class FormPageService(IServiceScopeFactory scopes, AuthenticationS
     public async Task<(bool Ok, Dictionary<string, string[]>? Errors, string? Error, bool Conflict)> UpdateAsync(
         Guid recordId, string title, int version,
         IReadOnlyList<FieldInfo> fields,
-        Dictionary<string, string?> text, Dictionary<string, bool> bools, Dictionary<string, List<string>> multi)
+        Dictionary<string, string?> text, Dictionary<string, bool> bools, Dictionary<string, List<string>> multi,
+        IReadOnlyDictionary<string, string>? secrets = null)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;

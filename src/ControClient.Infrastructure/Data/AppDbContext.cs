@@ -22,6 +22,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<GroupGrant> GroupGrants => Set<GroupGrant>();
     public DbSet<RecordGrant> RecordGrants => Set<RecordGrant>();
+    public DbSet<RecordSecret> RecordSecrets => Set<RecordSecret>();
     public DbSet<FormTemplate> FormTemplates => Set<FormTemplate>();
     public DbSet<RecordInstance> Records => Set<RecordInstance>();
     public DbSet<Document> Documents => Set<Document>();
@@ -145,6 +146,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_group_members_user");
         });
 
+        modelBuilder.Entity<RecordSecret>(e =>
+        {
+            e.ToTable("record_secrets");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+            e.Property(x => x.RecordId).HasColumnName("record_id");
+            e.Property(x => x.FieldKey).HasColumnName("field_key").HasMaxLength(80).IsRequired();
+            e.Property(x => x.Nonce).HasColumnName("nonce");
+            e.Property(x => x.Ciphertext).HasColumnName("ciphertext");
+            e.Property(x => x.DekNonce).HasColumnName("dek_nonce");
+            e.Property(x => x.WrappedDek).HasColumnName("wrapped_dek");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.CreatedBy).HasColumnName("created_by").HasMaxLength(200).IsRequired();
+            e.HasIndex(x => new { x.RecordId, x.FieldKey }).IsUnique().HasDatabaseName("ux_record_secrets_record_field");
+            e.HasOne<RecordInstance>().WithMany().HasForeignKey(x => x.RecordId)
+                .OnDelete(DeleteBehavior.Cascade).HasConstraintName("fk_record_secrets_record");
+        });
+
         modelBuilder.Entity<RecordGrant>(e =>
         {
             e.ToTable("record_grants");
@@ -204,6 +223,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 b.Property(f => f.Order).HasColumnName("order_index");
                 b.Property(f => f.OptionsJson).HasColumnName("options_json");
                 b.Property(f => f.HelpText).HasColumnName("help_text").HasMaxLength(500);
+                b.Property(f => f.IsSecret).HasColumnName("is_secret");
                 b.HasIndex("template_id").HasDatabaseName("ix_field_definitions_template");
             });
         });

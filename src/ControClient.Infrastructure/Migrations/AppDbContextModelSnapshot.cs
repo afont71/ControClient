@@ -463,6 +463,61 @@ namespace ControClient.Infrastructure.Migrations
                     b.ToTable("record_instances", (string)null);
                 });
 
+            modelBuilder.Entity("ControClient.Domain.Forms.RecordSecret", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("created_by");
+
+                    b.Property<byte[]>("DekNonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("dek_nonce");
+
+                    b.Property<string>("FieldKey")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("field_key");
+
+                    b.Property<byte[]>("Nonce")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("nonce");
+
+                    b.Property<Guid>("RecordId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("record_id");
+
+                    b.Property<byte[]>("WrappedDek")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("wrapped_dek");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordId", "FieldKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_record_secrets_record_field");
+
+                    b.ToTable("record_secrets", (string)null);
+                });
+
             modelBuilder.Entity("ControClient.Domain.Groups.Group", b =>
                 {
                     b.Property<Guid>("Id")
@@ -852,6 +907,10 @@ namespace ControClient.Infrastructure.Migrations
                                 .HasColumnType("boolean")
                                 .HasColumnName("is_required");
 
+                            b1.Property<bool>("IsSecret")
+                                .HasColumnType("boolean")
+                                .HasColumnName("is_secret");
+
                             b1.Property<string>("Key")
                                 .IsRequired()
                                 .HasMaxLength(80)
@@ -908,6 +967,16 @@ namespace ControClient.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_record_instances_template");
+                });
+
+            modelBuilder.Entity("ControClient.Domain.Forms.RecordSecret", b =>
+                {
+                    b.HasOne("ControClient.Domain.Forms.RecordInstance", null)
+                        .WithMany()
+                        .HasForeignKey("RecordId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_record_secrets_record");
                 });
 
             modelBuilder.Entity("ControClient.Domain.Groups.GroupGrant", b =>

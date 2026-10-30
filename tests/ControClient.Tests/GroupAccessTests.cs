@@ -191,6 +191,42 @@ public class GroupAccessTests
     }
 
     [Fact]
+    public async Task El_permiso_de_la_ficha_manda_al_revelar()
+    {
+        await using var db = Db();
+        var tech = User(AppRole.Technician);
+        var client = Client("Bodegas");
+        var group = new Group("Soporte", null, "admin");
+        var template = new FormTemplate("credencial", "Credencial", null,
+        [
+            new FieldDefinition("clave", "Clave", FieldType.Text, required: true, order: 1, isSecret: true)
+        ], version: 1);
+
+        db.Users.Add(tech);
+        db.Clients.Add(client);
+        db.Groups.Add(group);
+        db.FormTemplates.Add(template);
+        await db.SaveChangesAsync();
+
+        var conPermiso = new RecordInstance(client.Id, template, "A", "{}", "admin");
+        var sinPermiso = new RecordInstance(client.Id, template, "B", "{}", "admin");
+        db.Records.AddRange(conPermiso, sinPermiso);
+
+        db.GroupMembers.Add(new GroupMember(group.Id, tech.Id, "admin"));
+        db.GroupGrants.Add(new GroupGrant(group.Id, client.Id,
+            GrantActions.View | GrantActions.RevealSecret, "admin"));
+        db.RecordGrants.Add(new RecordGrant(group.Id, conPermiso.Id,
+            GrantActions.View | GrantActions.RevealSecret, "admin"));
+        db.RecordGrants.Add(new RecordGrant(group.Id, sinPermiso.Id, GrantActions.None, "admin"));
+        await db.SaveChangesAsync();
+
+        var service = new ClientAccessService(db, new ClientAccessPolicy());
+
+        Assert.True(await service.CanRevealRecordAsync(tech, client.Id, conPermiso.Id));
+        Assert.False(await service.CanRevealRecordAsync(tech, client.Id, sinPermiso.Id));
+    }
+
+    [Fact]
     public async Task Un_administrador_no_revela_por_pertenecer_a_un_grupo()
     {
         await using var db = Db();

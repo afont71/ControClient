@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using ControClient.Domain.Vault;
 using ControClient.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +23,8 @@ public sealed class VaultService(
 
     public bool IsInitialized => File.Exists(KeyFilePath);
 
+    public bool IsUnsealed => ring.IsUnsealed;
+
     private string KeyFilePath
     {
         get
@@ -38,6 +40,34 @@ public sealed class VaultService(
     }
 
     public string KeyProtectionDescription => protector.Description;
+
+    /// <summary>Cifra un valor asociado a una ficha (campo secreto) con la clave viva.</summary>
+    public (byte[] Nonce, byte[] Ciphertext, byte[] DekNonce, byte[] WrappedDek) SealValue(Guid aad, string plaintext)
+    {
+        var kek = ring.Require();
+        try
+        {
+            return VaultCrypto.Seal(kek, plaintext, aad);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(kek);
+        }
+    }
+
+    /// <summary>Descifra un valor de ficha. Requiere la bóveda desellada.</summary>
+    public string OpenValue(Guid aad, byte[] nonce, byte[] ciphertext, byte[] dekNonce, byte[] wrappedDek)
+    {
+        var kek = ring.Require();
+        try
+        {
+            return VaultCrypto.Open(kek, aad, nonce, ciphertext, dekNonce, wrappedDek);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(kek);
+        }
+    }
 
     public async Task<(bool Initialized, bool Unsealed, int Items)> GetStatusAsync(CancellationToken ct = default) =>
         (IsInitialized, ring.IsUnsealed, await db.VaultItems.CountAsync(ct));

@@ -33,7 +33,26 @@ else
                     <tr>
                         <th>@field.Label</th>
                         <td>
-                            @if (field.Type == "LongText")
+                            @if (field.IsSecret)
+                            {
+                                @if (_revealed.TryGetValue(field.Key, out var revealed))
+                                {
+                                    <code class="secret-value">@revealed</code>
+                                }
+                                else if (_view.SecretKeys.Contains(field.Key))
+                                {
+                                    <span class="muted">••••••••</span>
+                                    @if (_view.CanReveal)
+                                    {
+                                        <button class="small" @onclick="() => RevealAsync(field.Key)">Revelar</button>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="muted">—</span>
+                                }
+                            }
+                            else if (field.Type == "LongText")
                             {
                                 <div class="multiline">@DisplayValue(field)</div>
                             }
@@ -64,43 +83,55 @@ else
                 <label>
                     @field.Label @(field.Required ? "*" : "")
                     <br />
-                    @switch (field.Type)
+                    @if (field.IsSecret)
                     {
-                        case "Boolean":
-                            <input type="checkbox" @bind="_bools[field.Key]" />
-                            break;
-                        case "Select":
-                            <select @bind="_text[field.Key]">
-                                <option value="">—</option>
+                        <input type="password" @bind="_secrets[field.Key]"
+                               placeholder="Dejar vacío para conservar el secreto" autocomplete="new-password" />
+                        @if (_view.SecretKeys.Contains(field.Key))
+                        {
+                            <span class="muted small">Ya tiene un valor cifrado.</span>
+                        }
+                    }
+                    else
+                    {
+                        @switch (field.Type)
+                        {
+                            case "Boolean":
+                                <input type="checkbox" @bind="_bools[field.Key]" />
+                                break;
+                            case "Select":
+                                <select @bind="_text[field.Key]">
+                                    <option value="">—</option>
+                                    @foreach (var option in field.Options)
+                                    {
+                                        <option value="@option">@option</option>
+                                    }
+                                </select>
+                                break;
+                            case "MultiSelect":
                                 @foreach (var option in field.Options)
                                 {
-                                    <option value="@option">@option</option>
+                                    <label class="inline">
+                                        <input type="checkbox"
+                                               checked="@MultiContains(field.Key, option)"
+                                               @onchange="e => ToggleMulti(field.Key, option, e)" />
+                                        @option
+                                    </label>
                                 }
-                            </select>
-                            break;
-                        case "MultiSelect":
-                            @foreach (var option in field.Options)
-                            {
-                                <label class="inline">
-                                    <input type="checkbox"
-                                           checked="@MultiContains(field.Key, option)"
-                                           @onchange="e => ToggleMulti(field.Key, option, e)" />
-                                    @option
-                                </label>
-                            }
-                            break;
-                        case "LongText":
-                            <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
-                            break;
-                        case "Number":
-                            <input type="number" step="any" @bind="_text[field.Key]" />
-                            break;
-                        case "Date":
-                            <input type="date" value="@_text[field.Key]" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
-                            break;
-                        default:
-                            <input @bind="_text[field.Key]" />
-                            break;
+                                break;
+                            case "LongText":
+                                <textarea @bind="_text[field.Key]" rows="3" cols="50"></textarea>
+                                break;
+                            case "Number":
+                                <input type="number" step="any" @bind="_text[field.Key]" />
+                                break;
+                            case "Date":
+                                <input type="date" value="@_text[field.Key]" @onchange="e => _text[field.Key] = e.Value?.ToString()" />
+                                break;
+                            default:
+                                <input @bind="_text[field.Key]" />
+                                break;
+                        }
                     }
                 </label>
                 @if (_errors.TryGetValue(field.Key, out var messages))
@@ -124,6 +155,8 @@ else
     private readonly Dictionary<string, string?> _text = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, bool> _bools = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, List<string>> _multi = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _revealed = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string[]> _errors = new();
     private string _title = string.Empty;
     private bool _loading = true;
@@ -146,6 +179,8 @@ else
         _text.Clear();
         _bools.Clear();
         _multi.Clear();
+        _secrets.Clear();
+        _revealed.Clear();
         _errors = new();
         _title = _view.Title;
 
@@ -205,6 +240,23 @@ else
         }
     }
 
+    private async Task RevealAsync(string fieldKey)
+    {
+        if (_view is null) return;
+
+        var (value, error) = await Fichas.RevealAsync(_view.Id, fieldKey);
+        if (value is null)
+        {
+            _message = error ?? "No se pudo revelar.";
+            _isError = true;
+            return;
+        }
+
+        _revealed[fieldKey] = value;
+        _message = "Secreto revelado. Queda registrado en la auditoría.";
+        _isError = false;
+    }
+
     private async Task SaveAsync()
     {
         if (_view is null) return;
@@ -214,7 +266,8 @@ else
         try
         {
             var (ok, errors, error, conflict) = await Fichas.UpdateAsync(
-                _view.Id, _title, _view.Version, _view.Fields, _text, _bools, _multi);
+                _view.Id, _title, _view.Version, _view.Fields, _text, _bools, _multi,
+                _secrets.Where(s => !string.IsNullOrWhiteSpace(s.Value)).ToDictionary(s => s.Key, s => s.Value));
 
             if (conflict)
             {

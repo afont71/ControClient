@@ -26,4 +26,7 @@ public interface IClientAccessService
 
     /// <summary>Ver una ficha concreta: la concesión de la ficha sustituye a la del cliente.</summary>
     Task<bool> CanViewRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default);
+
+    /// <summary>Revelar un campo secreto de una ficha: la excepción de la ficha manda.</summary>
+    Task<bool> CanRevealRecordAsync(AppUser user, Guid clientId, Guid recordId, CancellationToken ct = default);
 }

@@ -1,4 +1,4 @@
-﻿@page "/plantillas"
+@page "/plantillas"
 @using Microsoft.AspNetCore.Authorization
 @using ControClient.Domain.Forms
 @attribute [Authorize]
@@ -11,7 +11,7 @@
 <p class="muted">
     Un tipo de ficha es una plantilla con sus campos. Por ejemplo: <em>Impresora</em> con
     <em>nombre</em>, <em>modelo</em>, <em>IP</em> y <em>fecha de compra</em>.
-    Aquí se define qué se puede rellenar después en cada cliente.
+    AquÃ­ se define quÃ© se puede rellenar despuÃ©s en cada cliente.
 </p>
 
 @if (_message is not null)
@@ -26,30 +26,30 @@
 else
 {
     <section class="panel">
-        <h2>@(_editingId is null ? "Nuevo tipo" : $"Editar «{_name}»")</h2>
+        <h2>@(_editingId is null ? "Nuevo tipo" : $"Editar Â«{_name}Â»")</h2>
 
         @if (_editingId is not null)
         {
             <p class="muted">
-                Guardar crea una versión nueva del tipo. Las fichas ya rellenadas conservan
-                la versión con la que se crearon.
+                Guardar crea una versiÃ³n nueva del tipo. Las fichas ya rellenadas conservan
+                la versiÃ³n con la que se crearon.
             </p>
         }
 
         <p>
             <label>Nombre<br /><input @bind="_name" placeholder="Impresora" /></label>
-            <label>Descripción<br /><input @bind="_description" placeholder="Para qué sirve este tipo" /></label>
+            <label>DescripciÃ³n<br /><input @bind="_description" placeholder="Para quÃ© sirve este tipo" /></label>
             <label>Clave interna<br /><input @bind="_key" placeholder="impresora" disabled="@(_editingId is not null)" /></label>
         </p>
         <p class="muted">
             La clave es un identificador interno sin espacios ni acentos (por ejemplo
-            <code>impresora</code>). No se muestra al usuario y no se puede cambiar después.
+            <code>impresora</code>). No se muestra al usuario y no se puede cambiar despuÃ©s.
         </p>
 
         <h3>Campos</h3>
         <table>
             <thead>
-                <tr><th>Etiqueta (lo que se ve)</th><th>Clave interna</th><th>Tipo</th><th>Obligatorio</th><th>Valores de la lista</th><th></th></tr>
+                <tr><th>Etiqueta (lo que se ve)</th><th>Clave interna</th><th>Tipo</th><th>Obligatorio</th><th>Secreto</th><th>Valores de la lista</th><th></th></tr>
             </thead>
             <tbody>
                 @foreach (var f in _fields)
@@ -66,14 +66,15 @@ else
                             </select>
                         </td>
                         <td><input type="checkbox" @bind="f.Required" /></td>
+                        <td><input type="checkbox" @bind="f.IsSecret" title="Se guarda cifrado y solo se revela con permiso" /></td>
                         <td>
                             @if (f.Type is nameof(FieldType.Select) or nameof(FieldType.MultiSelect))
                             {
-                                <input @bind="f.OptionsCsv" placeholder="Sí, No, No aplica" />
+                                <input @bind="f.OptionsCsv" placeholder="SÃ­, No, No aplica" />
                             }
                             else
                             {
-                                <span class="muted">—</span>
+                                <span class="muted">â€”</span>
                             }
                         </td>
                         <td><button @onclick="() => RemoveField(f)">Quitar</button></td>
@@ -82,13 +83,13 @@ else
             </tbody>
         </table>
         <p class="muted">
-            «Valores de la lista» solo se usa en los tipos Lista y Lista múltiple: escribe las
-            opciones separadas por comas, por ejemplo <code>Sí, No, No aplica</code>.
+            Â«Valores de la listaÂ» solo se usa en los tipos Lista y Lista mÃºltiple: escribe las
+            opciones separadas por comas, por ejemplo <code>SÃ­, No, No aplica</code>.
         </p>
 
         <p>
-            <button @onclick="AddField">+ Añadir campo</button>
-            <button @onclick="SaveAsync" disabled="@_busy">@(_editingId is null ? "Crear tipo" : "Guardar nueva versión")</button>
+            <button @onclick="AddField">+ AÃ±adir campo</button>
+            <button @onclick="SaveAsync" disabled="@_busy">@(_editingId is null ? "Crear tipo" : "Guardar nueva versiÃ³n")</button>
             @if (_editingId is not null)
             {
                 <button @onclick="CancelEdit">Cancelar</button>
@@ -99,13 +100,13 @@ else
     <section>
         <h2>Tipos existentes</h2>
         <table>
-            <thead><tr><th>Nombre</th><th>Descripción</th><th>Clave</th><th>Versión</th><th>Campos</th><th></th></tr></thead>
+            <thead><tr><th>Nombre</th><th>DescripciÃ³n</th><th>Clave</th><th>VersiÃ³n</th><th>Campos</th><th></th></tr></thead>
             <tbody>
                 @foreach (var t in _templates)
                 {
                     <tr>
                         <td>@t.Name</td>
-                        <td>@(t.Description ?? "—")</td>
+                        <td>@(t.Description ?? "â€”")</td>
                         <td><code>@t.Key</code></td>
                         <td>@t.Version</td>
                         <td>@t.Fields</td>
@@ -135,6 +136,7 @@ else
         public string Type { get; set; } = nameof(FieldType.Text);
         public bool Required { get; set; }
         public string? OptionsCsv { get; set; }
+        public bool IsSecret { get; set; }
         public bool Locked { get; set; }
     }
 
@@ -164,6 +166,7 @@ else
                 Type = f.Type,
                 Required = f.Required,
                 OptionsCsv = f.OptionsCsv,
+                IsSecret = f.IsSecret,
                 Locked = true
             });
         }
@@ -187,7 +190,7 @@ else
         {
             var drafts = _fields
                 .Where(f => !string.IsNullOrWhiteSpace(f.Key) || !string.IsNullOrWhiteSpace(f.Label))
-                .Select(f => new TemplatesPageService.FieldDraft(f.Key, f.Label, f.Type, f.Required, f.OptionsCsv))
+                .Select(f => new TemplatesPageService.FieldDraft(f.Key, f.Label, f.Type, f.Required, f.OptionsCsv, f.IsSecret))
                 .ToList();
 
             var (id, error) = _editingId is Guid editing
@@ -201,8 +204,8 @@ else
             }
 
             SetMessage(_editingId is null
-                ? "Tipo creado. Ya aparece al añadir información a un cliente."
-                : "Nueva versión guardada. Se usará en las próximas fichas.", false);
+                ? "Tipo creado. Ya aparece al aÃ±adir informaciÃ³n a un cliente."
+                : "Nueva versiÃ³n guardada. Se usarÃ¡ en las prÃ³ximas fichas.", false);
 
             CancelEdit();
             await LoadAsync();
@@ -217,14 +220,14 @@ else
     {
         nameof(FieldType.Text) => "Texto",
         nameof(FieldType.LongText) => "Texto largo",
-        nameof(FieldType.Number) => "Número",
+        nameof(FieldType.Number) => "NÃºmero",
         nameof(FieldType.Date) => "Fecha",
-        nameof(FieldType.Boolean) => "Sí/No",
+        nameof(FieldType.Boolean) => "SÃ­/No",
         nameof(FieldType.Select) => "Lista",
-        nameof(FieldType.MultiSelect) => "Lista múltiple",
+        nameof(FieldType.MultiSelect) => "Lista mÃºltiple",
         nameof(FieldType.Email) => "Correo",
         nameof(FieldType.Url) => "Enlace",
-        nameof(FieldType.Ip) => "Dirección IP",
+        nameof(FieldType.Ip) => "DirecciÃ³n IP",
         _ => type
     };
 
