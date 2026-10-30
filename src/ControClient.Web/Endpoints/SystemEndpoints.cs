@@ -194,6 +194,12 @@ public static class SystemEndpoints
             if (target.Id == actor.Id)
                 return Results.Forbid();
 
+            if (target.Role == AppRole.Administrator && role != AppRole.Administrator
+                && !await db.Users.AnyAsync(u => u.Role == AppRole.Administrator && u.IsActive && u.Id != target.Id, ct))
+            {
+                return Results.Conflict(new { error = "Debe quedar al menos un administrador activo." });
+            }
+
             target.ChangeRole(role);
             await db.SaveChangesAsync(ct);
 
@@ -234,6 +240,12 @@ public static class SystemEndpoints
             var target = await db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
             if (target is null)
                 return Results.NotFound();
+
+            if (!request.Active && target.Role == AppRole.Administrator
+                && !await db.Users.AnyAsync(u => u.Role == AppRole.Administrator && u.IsActive && u.Id != target.Id, ct))
+            {
+                return Results.Conflict(new { error = "Debe quedar al menos un administrador activo." });
+            }
 
             if (!request.Active)
                 target.Deactivate();

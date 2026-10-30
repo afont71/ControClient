@@ -156,6 +156,13 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         if (target.Id == actor.Id)
             return (false, "No puedes cambiar tu propio rol.");
 
+        if (target.Role == AppRole.Administrator
+            && parsed != AppRole.Administrator
+            && !await db.Users.AnyAsync(u => u.Role == AppRole.Administrator && u.IsActive && u.Id != target.Id))
+        {
+            return (false, "Debe quedar al menos un administrador activo.");
+        }
+
         target.ChangeRole(parsed);
         await db.SaveChangesAsync();
         await SyncSystemMembershipAsync(db, target);
@@ -178,8 +185,15 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         if (target is null)
             return (false, "Usuario inexistente.");
 
+        if (!active && target.Role == AppRole.Administrator
+            && !await db.Users.AnyAsync(u => u.Role == AppRole.Administrator && u.IsActive && u.Id != target.Id))
+        {
+            return (false, "Debe quedar al menos un administrador activo.");
+        }
+
         if (active) target.Activate(); else target.Deactivate();
         await db.SaveChangesAsync();
+        await SyncSystemMembershipAsync(db, target);
         await AuditAsync(sp, actor, active ? "users.activate" : "users.deactivate", $"usuario={target.EntraObjectId}");
         return (true, null);
     }
