@@ -12,7 +12,7 @@ namespace ControClient.Web.Pages;
 /// <summary>Gestión de usuarios para administración: rol, estado y grupos.</summary>
 public sealed class UsersPageService(IServiceScopeFactory scopes, AuthenticationStateProvider auth)
 {
-    public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, bool CanMarkSecrets, DateTimeOffset? LastLogin, string Groups, bool Pending);
+    public sealed record UserRow(Guid Id, string ObjectId, string Name, string? Email, string Role, bool IsActive, bool CanMarkSecrets, DateTimeOffset? LastLogin, string Groups, bool Pending, bool HasActivity);
 
     public async Task<IReadOnlyList<(Guid Id, string Name)>> GroupsAsync()
     {
@@ -66,7 +66,7 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         return (entity.Id, null);
     }
 
-    public async Task<IReadOnlyList<UserRow>?> ListAsync()
+    public async Task<IReadOnlyList<UserRow>?> ListAsync(bool includeInactive = false)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
@@ -74,12 +74,21 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
         if (actor is null || !actor.IsIn(AppRole.Administrator))
             return null;
 
-        var users = await db.Users.AsNoTracking().OrderBy(u => u.DisplayName).ToListAsync();
+        var users = await db.Users.AsNoTracking()
+            .Where(u => u.IsActive == !includeInactive)
+            .OrderBy(u => u.DisplayName)
+            .ToListAsync();
 
         var memberships = await (
             from m in db.GroupMembers.AsNoTracking()
             join g in db.Groups.AsNoTracking() on m.GroupId equals g.Id
             select new { m.UserId, GroupName = g.Name }).ToListAsync();
+
+        var actors = await db.AuditEvents.AsNoTracking()
+            .Where(a => a.ActorObjectId != null)
+            .Select(a => a.ActorObjectId!)
+            .Distinct()
+            .ToListAsync();
 
         return users.Select(u => new UserRow(
             u.Id,
@@ -91,32 +100,44 @@ public sealed class UsersPageService(IServiceScopeFactory scopes, Authentication
             u.CanMarkSecrets,
             u.LastLoginAt,
             string.Join(", ", memberships.Where(m => m.UserId == u.Id).Select(m => m.GroupName)),
-            u.IsPending
+            u.IsPending,
+            u.LastLoginAt is not null || actors.Contains(u.EntraObjectId)
         )).ToList();
     }
-
-    public async Task<(bool Ok, string? Error)> DeletePendingAsync(Guid userId)
+    public async Task<(bool Ok, string? Error)> DeleteAsync(Guid userId)
     {
         using var scope = scopes.CreateScope();
         var sp = scope.ServiceProvider;
         var (actor, db) = await ResolveAsync(sp);
         if (actor is null || !actor.IsIn(AppRole.Administrator))
-            return (false, "Solo un administrador puede eliminar fichas.");
+            return (false, "Solo un administrador puede eliminar usuarios.");
 
         var target = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (target is null)
             return (true, null);
 
-        if (!target.IsPending)
-            return (false, "Solo se pueden eliminar fichas pendientes. Para un usuario real, desactívalo.");
+        if (target.Id == actor.Id)
+            return (false, "No puedes eliminar tu propia cuenta.");
+
+        if (await HasActivityAsync(db, target))
+            return (false, "El usuario tiene movimientos: desactívalo para archivarlo.");
 
         var email = target.Email;
+        db.GroupMembers.RemoveRange(db.GroupMembers.Where(m => m.UserId == userId));
+        db.Grants.RemoveRange(db.Grants.Where(g => g.UserId == userId));
         db.Users.Remove(target);
         await db.SaveChangesAsync();
-        await AuditAsync(sp, actor, "users.delete_pending", $"usuario={email}");
+        await AuditAsync(sp, actor, "users.delete", $"usuario={email}");
         return (true, null);
     }
 
+    private static async Task<bool> HasActivityAsync(AppDbContext db, AppUser user)
+    {
+        if (user.LastLoginAt is not null)
+            return true;
+
+        return await db.AuditEvents.AnyAsync(a => a.ActorObjectId == user.EntraObjectId);
+    }
     public async Task<(bool Ok, string? Error)> SetCanMarkSecretsAsync(Guid userId, bool allowed)
     {
         using var scope = scopes.CreateScope();

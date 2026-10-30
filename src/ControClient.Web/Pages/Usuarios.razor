@@ -85,12 +85,17 @@ else
     </section>
 }
 
+<div class="toolbar">
+    <button class="@(_showInactive ? "" : "primary")" @onclick="() => SwitchTabAsync(false)">Activos</button>
+    <button class="@(_showInactive ? "primary" : "")" @onclick="() => SwitchTabAsync(true)">Inactivos</button>
+</div>
+
 @if (_users is null)
 {
 }
 else if (_users.Count == 0)
 {
-    <p>Sin usuarios.</p>
+    <p>@(_showInactive ? "Sin usuarios inactivos." : "Sin usuarios activos.")</p>
 }
 else
 {
@@ -129,10 +134,18 @@ else
                     <td>
                         <input type="checkbox" checked="@u.IsActive" @onchange="e => SetActiveAsync(u.Id, e.Value is bool b && b)" />
                     </td>
-                    <td>
-                        @if (u.Pending)
+                    <td class="row-actions">
+                        @if (!u.IsActive)
                         {
-                            <button @onclick="() => DeletePendingAsync(u.Id)">Eliminar</button>
+                            <button class="small" @onclick="() => SetActiveAsync(u.Id, true)">Reactivar</button>
+                        }
+                        @if (!u.HasActivity)
+                        {
+                            <button class="small danger" @onclick="() => DeleteAsync(u.Id)">Eliminar</button>
+                        }
+                        else
+                        {
+                            <span class="muted small" title="Tiene movimientos: se conserva como archivo">archivado con historial</span>
                         }
                     </td>
                 </tr>
@@ -154,6 +167,7 @@ else
     private IReadOnlyList<(Guid Id, string Name)> _groups = [];
     private readonly HashSet<Guid> _selectedGroups = [];
     private string _groupToAdd = string.Empty;
+    private bool _showInactive;
 
     protected override async Task OnInitializedAsync()
     {
@@ -171,7 +185,13 @@ else
 
     private void RemoveGroup(Guid groupId) => _selectedGroups.Remove(groupId);
 
-    private async Task LoadAsync() => _users = await Servicio.ListAsync();
+    private async Task LoadAsync() => _users = await Servicio.ListAsync(_showInactive);
+
+    private async Task SwitchTabAsync(bool showInactive)
+    {
+        _showInactive = showInactive;
+        await LoadAsync();
+    }
 
     private async Task PreRegisterAsync()
     {
@@ -219,10 +239,10 @@ else
         await LoadAsync();
     }
 
-    private async Task DeletePendingAsync(Guid userId)
+    private async Task DeleteAsync(Guid userId)
     {
-        var (ok, error) = await Servicio.DeletePendingAsync(userId);
-        SetMessage(ok ? "Ficha pendiente eliminada." : error ?? "No se pudo eliminar.", !ok);
+        var (ok, error) = await Servicio.DeleteAsync(userId);
+        SetMessage(ok ? "Usuario eliminado." : error ?? "No se pudo eliminar.", !ok);
         await LoadAsync();
     }
 

@@ -288,20 +288,24 @@ public static class SystemEndpoints
             if (target.Id == actor.Id)
                 return Results.Conflict(new { error = "No puedes eliminar tu propia cuenta." });
 
-            if (!target.IsPending)
+            if (target.LastLoginAt is not null
+                || await db.AuditEvents.AnyAsync(a => a.ActorObjectId == target.EntraObjectId, ct))
+            {
                 return Results.Conflict(new
                 {
-                    error = "Solo se pueden eliminar fichas pendientes (sin primer acceso). " +
-                            "Para un usuario real, desactívalo: conserva su historial y evita recrearlo."
+                    error = "El usuario tiene movimientos: desactívalo para archivarlo."
                 });
+            }
 
             var email = target.Email;
+            db.GroupMembers.RemoveRange(db.GroupMembers.Where(m => m.UserId == target.Id));
+            db.Grants.RemoveRange(db.Grants.Where(g => g.UserId == target.Id));
             db.Users.Remove(target);
             await db.SaveChangesAsync(ct);
 
             await audit.WriteAsync(new AuditEvent(
                 entity: "users",
-                action: "users.delete_pending",
+                action: "users.delete",
                 actorName: actor.DisplayName,
                 actorObjectId: actor.EntraObjectId,
                 correlationId: http.HttpContext?.TraceIdentifier ?? Guid.NewGuid().ToString("N"),
