@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.DataProtection;
+﻿using Microsoft.AspNetCore.Server.Kestrel.Https;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.Security.Claims;
@@ -15,6 +16,52 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Identity.Web;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Kestrel: HTTP en la red local y HTTPS opcional con certificado PFX. El PFX se
+// carga en memoria (EphemeralKeySet) para no depender del almacén del usuario.
+var httpPort = builder.Configuration.GetValue("Https:HttpPort", 5080);
+var httpsPort = builder.Configuration.GetValue("Https:Port", 5443);
+var pfxPath = builder.Configuration["Https:PfxPath"];
+var pfxPassword = builder.Configuration["Https:PfxPassword"];
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(httpPort);
+
+    var thumbprint = builder.Configuration["Https:Thumbprint"];
+    System.Security.Cryptography.X509Certificates.X509Certificate2? storedCertificate = null;
+    if (!string.IsNullOrWhiteSpace(thumbprint))
+    {
+        using var store = new System.Security.Cryptography.X509Certificates.X509Store(
+            System.Security.Cryptography.X509Certificates.StoreName.My,
+            System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser);
+        store.Open(System.Security.Cryptography.X509Certificates.OpenFlags.ReadOnly);
+        storedCertificate = store.Certificates
+            .Find(System.Security.Cryptography.X509Certificates.X509FindType.FindByThumbprint, thumbprint, validOnly: false)
+            .OfType<System.Security.Cryptography.X509Certificates.X509Certificate2>()
+            .FirstOrDefault();
+    }
+
+    if (storedCertificate is not null)
+    {
+        options.ListenAnyIP(httpsPort, listen => listen.UseHttps(storedCertificate));
+    }
+    else if (!string.IsNullOrWhiteSpace(pfxPath) && File.Exists(pfxPath))
+    {
+        try
+        {
+            var certificate = System.Security.Cryptography.X509Certificates.X509CertificateLoader
+                .LoadPkcs12FromFile(pfxPath, pfxPassword,
+                    System.Security.Cryptography.X509Certificates.X509KeyStorageFlags.DefaultKeySet);
+
+            options.ListenAnyIP(httpsPort, listen => listen.UseHttps(certificate));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"No se pudo cargar el certificado HTTPS: {ex.Message}");
+        }
+    }
+});
 
 // Evita el proveedor EventLog de Windows (requiere permisos en el registro de
 // eventos) y deja logging explícito: consola en desarrollo, servicio/archivo en producción.

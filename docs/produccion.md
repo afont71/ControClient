@@ -1,4 +1,4 @@
-# Producción: puesta en marcha y operación
+﻿# Producción: puesta en marcha y operación
 
 Checklist para pasar de la máquina de desarrollo a un servidor que se pueda usar
 con datos reales. Nada de esto es opcional si hay información de clientes dentro.
@@ -122,3 +122,40 @@ dotnet ef database update -p src/ControClient.Infrastructure -s src/ControClient
 ```
 
 Haz copia antes de cada actualización con migración.
+
+## Acceso desde otro equipo de la red
+
+Entra ID **no admite http:// para hosts que no sean localhost**, así que el acceso
+desde la LAN va por HTTPS con un certificado.
+
+### 1. Certificado
+
+En el servidor hay un certificado autofirmado en `Cert:\CurrentUser\My` (huella
+`1FF590723055F44E526E39611712CB5FEDDA86A6`) y su versión pública en
+`C:\organizaCLI\contoclient-data\certs\contoclient.cer`.
+
+- En cada equipo cliente: importar el `.cer` en **Entidades de certificación raíz de confianza**.
+- Alternativa: usar un certificado de la CA interna y desplegarlo por directiva.
+
+### 2. Cortafuegos (consola elevada)
+
+```powershell
+New-NetFirewallRule -DisplayName "ControClient LAN" -Direction Inbound -Protocol TCP -LocalPort 5080,5443 -Action Allow -Profile Private,Domain
+```
+
+### 3. Entra ID
+
+En el registro de la aplicación, plataforma **Web**, añadir:
+
+- `https://PCKOTO:5443/signin-oidc`
+- `https://PCKOTO:5443/signout-callback-oidc`
+
+Si el tenant rechaza el nombre corto, usar `https://pckoto.ideonetworks.local:5443/...`
+y resolver ese nombre por DNS interno (o `hosts` en los clientes).
+
+### 4. Acceso
+
+- Desde otro equipo: **https://PCKOTO:5443** (o la IP, que dará aviso de certificado).
+- `http://PCKOTO:5080` redirige a HTTPS.
+- La aplicación escucha en `0.0.0.0:5080` y `0.0.0.0:5443`; no pasar `--urls` al arrancar,
+  porque sustituye esta configuración.
